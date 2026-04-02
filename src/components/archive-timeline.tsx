@@ -10,8 +10,8 @@ type ArchiveItem = {
   title: string;
   publishedAt: string | null;
   categoryLabel: string;
-  kind: "文章" | "动态";
-  meta: string;
+  kindLabel: "Posts" | "Updates";
+  meta?: string;
 };
 
 export type ArchiveYearGroup = {
@@ -127,7 +127,7 @@ export function ArchiveTimeline({ groups }: ArchiveTimelineProps) {
                               <span>{item.categoryLabel}</span>
                             </div>
                             <span className="rounded-full bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary dark:bg-sky-300/12 dark:text-sky-300">
-                              {item.kind}
+                              {item.kindLabel}
                             </span>
                           </div>
 
@@ -135,11 +135,11 @@ export function ArchiveTimeline({ groups }: ArchiveTimelineProps) {
                             {item.title}
                           </h3>
 
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-                            <RelativeDate value={item.publishedAt} />
-                            <span>·</span>
-                            <span>{item.meta}</span>
-                          </div>
+                          {item.meta ? (
+                            <div className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                              {item.meta}
+                            </div>
+                          ) : null}
                         </Link>
                       </article>
                     ))}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArchiveTimeline, type ArchiveYearGroup } from "@/components/archive-timeline";
+import { SearchDialog } from "@/components/search-dialog";
 import { ScrollToTopLink } from "@/components/scroll-to-top-link";
 import { SiteLogoMark } from "@/components/site-logo-mark";
 import { formatPostTerm, getPublishedPosts } from "@/lib/posts";
@@ -19,8 +20,10 @@ type ArchiveItem = {
   title: string;
   publishedAt: string | null;
   categoryLabel: string;
-  kind: "文章" | "动态";
-  meta: string;
+  kindLabel: "Posts" | "Updates";
+  meta?: string;
+  summary: string;
+  searchText: string;
 };
 
 const archiveTypes: Array<{ value: ArchiveType; label: string }> = [
@@ -51,24 +54,41 @@ export default async function ArchivesPage({ searchParams }: ArchivesPageProps) 
             posts, and the journey goes on
           </span>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {archiveTypes.map((item) => {
-            const active = archiveType === item.value;
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {archiveTypes.map((item) => {
+              const active = archiveType === item.value;
 
-            return (
-              <Link
-                key={item.value}
-                href={item.value === "all" ? "/archives" : `/archives?type=${item.value}`}
-                className={`px-1 py-1 text-sm font-medium transition ${
-                  active
-                    ? "text-primary dark:text-sky-300"
-                    : "text-zinc-500 hover:text-primary dark:text-zinc-400 dark:hover:text-sky-300"
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
+              return (
+                <Link
+                  key={item.value}
+                  href={item.value === "all" ? "/archives" : `/archives?type=${item.value}`}
+                  className={`px-1 py-1 text-sm font-medium transition ${
+                    active
+                      ? "text-primary dark:text-sky-300"
+                      : "text-zinc-500 hover:text-primary dark:text-zinc-400 dark:hover:text-sky-300"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+          <SearchDialog
+            buttonLabel="Search"
+            placeholder="Search archives"
+            emptyState="No matching archive entries found."
+            idleState="Search by title, type, category, or content."
+            items={items.map((item) => ({
+              id: item.id,
+              href: item.href,
+              title: item.title,
+              publishedAt: item.publishedAt,
+              overline: `${item.kindLabel} / ${item.categoryLabel}`,
+              preview: item.summary,
+              searchText: item.searchText,
+            }))}
+          />
         </div>
       </div>
 
@@ -98,8 +118,17 @@ function getArchiveItems(type: ArchiveType): ArchiveItem[] {
     title: post.title,
     publishedAt: post.publishedAt,
     categoryLabel: formatPostTerm(post.category),
-    kind: "文章",
+    kindLabel: "Posts",
     meta: post.authorName,
+    summary: post.description,
+    searchText: [
+      post.title,
+      post.description,
+      formatPostTerm(post.category),
+      post.authorName,
+      ...post.tags.map((tag) => formatPostTerm(tag)),
+      ...post.content,
+    ].join(" "),
   }));
 
   const updateItems: ArchiveItem[] = getPublishedUpdates().map((update) => ({
@@ -108,8 +137,16 @@ function getArchiveItems(type: ArchiveType): ArchiveItem[] {
     title: update.title,
     publishedAt: update.publishedAt,
     categoryLabel: formatUpdateTerm(update.category),
-    kind: "动态",
-    meta: "Update",
+    kindLabel: "Updates",
+    summary: formatUpdateTerm(update.category),
+    searchText: [
+      update.title,
+      update.summary,
+      formatUpdateTerm(update.category),
+      "Updates",
+      ...update.tags.map((tag) => formatUpdateTerm(tag)),
+      ...update.content,
+    ].join(" "),
   }));
 
   const items =

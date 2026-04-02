@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PostSearchDialog } from "@/components/post-search-dialog";
+import { SearchDialog } from "@/components/search-dialog";
 import { PostTagsPanel } from "@/components/post-tags-panel";
 import { RelativeDate } from "@/components/relative-date";
 import { formatPostTerm, getPublishedPosts } from "@/lib/posts";
@@ -114,7 +114,7 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
           Writing
         </p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-          Posts
+          文章
         </h1>
         {activeFilters.length > 0 ? (
           <div className="mt-5 flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
@@ -256,15 +256,26 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
               <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
                 Search
               </p>
-              <PostSearchDialog
-                posts={allPosts.map((post) => ({
-                  slug: post.slug,
+              <SearchDialog
+                buttonLabel="Search posts"
+                placeholder="Search posts, tags, and notes"
+                emptyState="No matching posts found."
+                idleState="Search by title, tag, category, or a line from the post."
+                items={allPosts.map((post) => ({
+                  id: post.id,
+                  href: `/posts/${post.slug}`,
                   title: post.title,
-                  description: post.description,
-                  category: formatPostTerm(post.category),
-                  tags: post.tags.map((item) => formatPostTerm(item)),
                   publishedAt: post.publishedAt,
-                  content: post.content,
+                  overline: formatPostTerm(post.category),
+                  preview: post.description,
+                  searchText: [
+                    post.title,
+                    post.description,
+                    formatPostTerm(post.category),
+                    post.authorName,
+                    ...post.tags.map((item) => formatPostTerm(item)),
+                    ...post.content,
+                  ].join(" "),
                 }))}
               />
             </div>
