@@ -3,9 +3,17 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
-  --background: #ffffff;
+  --background-rgb: 255 255 255;
+  --background-tint-rgb: 248 250 252;
+  --background: rgb(var(--background-rgb));
   --foreground: #171717;
-  --primary: #5e81ac;
+  --primary-rgb: 94 129 172;
+  --primary: rgb(var(--primary-rgb));
+  --footer-bg: color-mix(
+    in srgb,
+    rgb(var(--primary-rgb)) 20%,
+    rgb(var(--background-rgb))
+  );
 }
 
 @theme inline {
@@ -19,9 +27,17 @@
 }
 
 html[data-theme="dark"] {
-  --background: #0a0a0a;
+  --background-rgb: 10 10 10;
+  --background-tint-rgb: 12 14 20;
+  --background: rgb(var(--background-rgb));
   --foreground: #ededed;
-  --primary: #38bdf8;
+  --primary-rgb: 56 189 248;
+  --primary: rgb(var(--primary-rgb));
+  --footer-bg: color-mix(
+    in srgb,
+    rgb(var(--primary-rgb)) 8%,
+    rgb(var(--background-tint-rgb))
+  );
   color-scheme: dark;
 }
 
@@ -33,6 +49,14 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+.site-footer-surface {
+  background: var(--footer-bg);
+}
+
+.site-footer-fade {
+  background: linear-gradient(180deg, transparent, var(--footer-bg));
 }
 
 .hero-orb {
@@ -59,9 +83,13 @@ body {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at top center, rgb(94 129 172 / 0.14), transparent 32%),
-    radial-gradient(circle at bottom center, rgb(94 129 172 / 0.12), transparent 38%),
-    linear-gradient(180deg, rgb(255 255 255 / 0.96), rgb(248 250 252 / 0.92));
+    radial-gradient(circle at top center, rgb(var(--primary-rgb) / 0.14), transparent 32%),
+    radial-gradient(circle at bottom center, rgb(var(--primary-rgb) / 0.12), transparent 38%),
+    linear-gradient(
+      180deg,
+      rgb(var(--background-rgb) / 0.96),
+      rgb(var(--background-tint-rgb) / 0.92)
+    );
 }
 
 .site-bottom-noise::after {
@@ -80,9 +108,13 @@ body {
 html[data-theme="dark"] {
   .site-bottom-noise {
     background:
-      radial-gradient(circle at top center, rgb(56 189 248 / 0.16), transparent 28%),
-      radial-gradient(circle at bottom center, rgb(125 211 252 / 0.1), transparent 32%),
-      linear-gradient(180deg, rgb(7 7 10 / 0.98), rgb(12 14 20 / 0.96));
+      radial-gradient(circle at top center, rgb(var(--primary-rgb) / 0.16), transparent 28%),
+      radial-gradient(circle at bottom center, rgb(var(--primary-rgb) / 0.1), transparent 32%),
+      linear-gradient(
+        180deg,
+        rgb(var(--background-rgb) / 0.98),
+        rgb(var(--background-tint-rgb) / 0.96)
+      );
   }
 
   .site-bottom-noise::after {

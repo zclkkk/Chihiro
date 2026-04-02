@@ -39,10 +39,10 @@ export function SiteFooter() {
   const mottoLines = splitFooterMotto(siteConfig.motto);
 
   return (
-    <footer className="relative z-10 mt-20 bg-[rgb(224_234_244_/_0.98)] dark:bg-[rgb(6_9_14_/_0.98)]">
+    <footer className="site-footer-surface relative z-10 mt-20">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 -top-40 h-40 bg-[linear-gradient(180deg,rgba(224,234,244,0),rgba(224,234,244,0.98))] dark:bg-[linear-gradient(180deg,rgba(6,9,14,0),rgba(6,9,14,0.98))]"
+        className="site-footer-fade pointer-events-none absolute inset-x-0 -top-40 h-40"
       />
 
       <div className="relative mx-auto max-w-6xl px-6 pb-8 pt-14 sm:px-10">

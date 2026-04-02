@@ -41,7 +41,7 @@ export const posts: Post[] = [
     slug: "why-structure-comes-first",
     description: "A short note on why the routing and post model are the first building blocks.",
     status: "published",
-    publishedAt: "2026-03-29",
+    publishedAt: "2025-10-21",
     updatedAt: "2026-03-29",
     category: "engineering",
     tags: ["architecture"],

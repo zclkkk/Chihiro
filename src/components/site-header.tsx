@@ -7,6 +7,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
   BookOpenText,
+  ChevronDown,
+  ChevronUp,
   Compass,
   FileArchive,
   GalleryVerticalEnd,
@@ -19,6 +21,7 @@ import { RelativeDate } from "@/components/relative-date";
 import { ThemeModeToggle } from "@/components/theme-mode-toggle";
 import { formatPostTerm, getPublishedPosts } from "@/lib/posts";
 import { siteConfig } from "@/lib/site";
+import { formatUpdateTerm, getPublishedUpdates } from "@/lib/updates";
 
 const navItems = [
   {
@@ -54,6 +57,7 @@ const navItems = [
 ];
 
 const publishedPosts = getPublishedPosts();
+const publishedUpdates = getPublishedUpdates();
 const postCategories = Array.from(
   new Set(publishedPosts.map((post) => post.category)),
 )
@@ -65,32 +69,54 @@ const postCategories = Array.from(
   }))
   .sort((a, b) => b.posts.length - a.posts.length || a.label.localeCompare(b.label));
 
-const updateCategories = [
-  {
-    tag: "build-logs",
-    label: "Build Logs",
-    href: "/updates?category=build-logs",
-    items: ["March progress", "Admin console pass", "Publishing flow notes"],
-  },
-  {
-    tag: "notes",
-    label: "Notes",
-    href: "/updates?category=notes",
-    items: ["Small observations", "Interface tweaks", "Things worth revisiting"],
-  },
-  {
-    tag: "experiments",
-    label: "Experiments",
-    href: "/updates?category=experiments",
-    items: ["New nav directions", "Homepage variations", "Dark mode texture tests"],
-  },
-  {
-    tag: "changelog",
-    label: "Changelog",
-    href: "/updates?category=changelog",
-    items: ["Header refinements", "Mobile nav updates", "Content model cleanup"],
-  },
-];
+const updateCategories = Array.from(
+  new Set(publishedUpdates.map((update) => update.category)),
+)
+  .map((category) => {
+    const items = publishedUpdates.filter((update) => update.category === category);
+
+    return {
+      tag: category,
+      label: formatUpdateTerm(category),
+      href: `/updates?category=${encodeURIComponent(category)}`,
+      items: items.map((item) => item.title),
+    };
+  })
+  .sort((a, b) => b.items.length - a.items.length || a.label.localeCompare(b.label));
+
+type RecentArchiveItem = {
+  id: string;
+  href: string;
+  title: string;
+  categoryLabel: string;
+  publishedAt: string | null;
+  kind: "文章" | "动态";
+};
+
+const recentArchiveItems: RecentArchiveItem[] = [
+  ...publishedPosts.map((post) => ({
+    id: post.id,
+    href: `/posts/${post.slug}`,
+    title: post.title,
+    categoryLabel: formatPostTerm(post.category),
+    publishedAt: post.publishedAt,
+    kind: "文章" as const,
+  })),
+  ...publishedUpdates.map((item) => ({
+    id: item.id,
+    href: item.href,
+    title: item.title,
+    categoryLabel: formatUpdateTerm(item.category),
+    publishedAt: item.publishedAt,
+    kind: "动态" as const,
+  })),
+]
+  .sort((a, b) => {
+    const aTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+    const bTime = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+    return bTime - aTime;
+  })
+  .slice(0, 5);
 
 const morePlaceholders = [
   { eyebrow: "Projects", title: "项目" },
@@ -102,6 +128,7 @@ const morePlaceholders = [
 export function SiteHeader() {
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileBrandVisible, setIsMobileBrandVisible] = useState(true);
   const [isMegaNavOpen, setIsMegaNavOpen] = useState(false);
   const [highlightedHref, setHighlightedHref] = useState<string | null>(null);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -116,6 +143,7 @@ export function SiteHeader() {
   const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const mobileMenuPanelRef = useRef<HTMLDivElement | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastScrollTopRef = useRef(0);
   const deferredIsScrolled = useDeferredValue(isScrolled);
 
   useEffect(() => {
@@ -127,7 +155,19 @@ export function SiteHeader() {
       0;
 
     const handleScroll = () => {
-      setIsScrolled(getScrollTop() > 20);
+      const nextScrollTop = getScrollTop();
+
+      setIsScrolled(nextScrollTop > 20);
+
+      if (nextScrollTop <= 20) {
+        setIsMobileBrandVisible(true);
+      } else if (nextScrollTop > lastScrollTopRef.current) {
+        setIsMobileBrandVisible(false);
+      } else if (nextScrollTop < lastScrollTopRef.current) {
+        setIsMobileBrandVisible(true);
+      }
+
+      lastScrollTopRef.current = nextScrollTop;
     };
 
     handleScroll();
@@ -245,9 +285,13 @@ export function SiteHeader() {
         </button>
         <Link
           href="/"
-          className={`pointer-events-auto absolute left-1/2 -translate-x-1/2 rounded-2xl px-3 py-1.5 text-lg font-semibold tracking-tight text-primary transition md:static md:translate-x-0 md:justify-self-start ${
+          className={`absolute left-1/2 rounded-2xl px-3 py-1.5 text-lg font-semibold tracking-tight text-primary transition-[opacity,transform] duration-200 md:pointer-events-auto md:static md:translate-x-0 md:translate-y-0 md:justify-self-start md:opacity-100 ${
+            isMobileBrandVisible
+              ? "pointer-events-auto translate-x-[-50%] opacity-100"
+              : "pointer-events-none translate-x-[-50%] -translate-y-2 opacity-0"
+          } ${
             isScrolled
-              ? "border border-zinc-200/80 bg-white/80 shadow-sm dark:border-zinc-800/70 dark:bg-zinc-950/65 dark:backdrop-blur-xl dark:shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
+              ? "border border-transparent bg-transparent shadow-none md:border-zinc-200/80 md:bg-white/80 md:shadow-sm dark:md:border-zinc-800/70 dark:md:bg-zinc-950/65 dark:md:backdrop-blur-xl dark:md:shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
               : "border border-transparent bg-transparent"
           }`}
         >
@@ -391,7 +435,7 @@ export function SiteHeader() {
                     <div
                       key={item.href}
                       className={`rounded-[1.1rem] transition ${
-                        active || expanded
+                        active
                           ? "bg-primary/8 dark:bg-primary/15"
                           : "bg-zinc-50/80 dark:bg-zinc-900"
                       }`}
@@ -423,18 +467,18 @@ export function SiteHeader() {
                             )
                           }
                           className={`inline-flex h-9 min-w-11 shrink-0 items-center justify-center rounded-2xl border px-2 transition ${
-                            expanded
+                            active
                               ? "border-primary/20 bg-primary/10 text-primary dark:border-sky-300/20 dark:bg-sky-400/12 dark:text-sky-300"
                               : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800/90 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-200"
                           }`}
                         >
-                          <motion.span
-                            animate={{ rotate: expanded ? 90 : 0 }}
-                            transition={{ duration: 0.18, ease: "easeOut" }}
-                            className="inline-flex"
-                          >
-                            <ArrowRight className="h-4 w-4" />
-                          </motion.span>
+                          <span className="inline-flex">
+                            {expanded ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </span>
                         </button>
                       </div>
 
@@ -530,45 +574,37 @@ function renderMegaNavContent(
           <div className="min-w-0">
             <div className="mb-2.5 flex items-center justify-between gap-3">
               <p className="text-[0.68rem] uppercase tracking-[0.24em] text-zinc-400 dark:text-zinc-500">
-                Articles
+                Latest
               </p>
-              <Link
-                href="/archives"
-                onClick={options.onNavigate}
-                className="text-xs font-medium text-zinc-500 transition hover:text-primary dark:text-zinc-400 dark:hover:text-sky-300"
-              >
-                View archive
-              </Link>
             </div>
             <div className="grid gap-1">
-              {publishedPosts.slice(0, 4).map((post) => (
-                <MegaNavArchiveEntry
-                  key={post.id}
-                  href={`/posts/${post.slug}`}
-                  title={post.title}
-                  meta={post.publishedAt ?? ""}
-                  dateValue={post.publishedAt}
+              {recentArchiveItems.map((item) => (
+                <MegaNavRecentEntry
+                  key={item.id}
+                  href={item.href}
+                  title={item.title}
+                  categoryLabel={item.categoryLabel}
+                  kind={item.kind}
+                  dateValue={item.publishedAt}
                   onNavigate={options.onNavigate}
                 />
               ))}
             </div>
           </div>
 
-          <div className="border-t border-zinc-200/70 pt-3 dark:border-zinc-800/80">
-            <p className="mb-2.5 text-[0.68rem] uppercase tracking-[0.24em] text-zinc-400 dark:text-zinc-500">
-              Updates
-            </p>
-            <div className="grid gap-1">
-              {updateCategories.map((category) => (
-                <MegaNavArchiveEntry
-                  key={category.href}
-                  href={category.href}
-                  title={category.label}
-                  meta="Category"
-                  onNavigate={options.onNavigate}
-                />
-              ))}
-            </div>
+          <div className="grid gap-2 border-t border-zinc-200/70 pt-3 sm:grid-cols-2 dark:border-zinc-800/80">
+            <MegaNavLinkCard
+              href="/archives?type=posts"
+              title="文章归档"
+              eyebrow="Posts"
+              onNavigate={options.onNavigate}
+            />
+            <MegaNavLinkCard
+              href="/archives?type=updates"
+              title="动态归档"
+              eyebrow="Updates"
+              onNavigate={options.onNavigate}
+            />
           </div>
         </div>
       );
@@ -597,10 +633,10 @@ function renderMobileNavContent(href: string, onNavigate: () => void) {
   switch (href) {
     case "/":
       return (
-        <div className="grid gap-2">
-          <MobileNavSubLink href="/" label="此站点" onNavigate={onNavigate} />
-          <MobileNavSubLink href="/more" label="自述" onNavigate={onNavigate} />
-          <MobileNavSubLink href="/message" label="留言" onNavigate={onNavigate} />
+        <div className="flex flex-wrap gap-2">
+          <MobileNavChip href="/" label="此站点" onNavigate={onNavigate} />
+          <MobileNavChip href="/more" label="自述" onNavigate={onNavigate} />
+          <MobileNavChip href="/message" label="留言" onNavigate={onNavigate} />
         </div>
       );
     case "/posts":
@@ -909,6 +945,43 @@ function MegaNavArchiveEntry({
   );
 }
 
+function MegaNavRecentEntry({
+  href,
+  title,
+  categoryLabel,
+  kind,
+  dateValue,
+  onNavigate,
+}: {
+  href: string;
+  title: string;
+  categoryLabel: string;
+  kind: "文章" | "动态";
+  dateValue: string | null;
+  onNavigate: () => void;
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className="group rounded-[0.95rem] px-2 py-2 transition-colors duration-200 hover:bg-zinc-50/90 dark:hover:bg-zinc-900/70"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[0.68rem] font-medium tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
+          {kind}
+        </span>
+        <span className="text-xs text-zinc-400 dark:text-zinc-500">
+          <RelativeDate value={dateValue} />
+        </span>
+      </div>
+      <p className="mt-1 text-sm font-medium text-zinc-900 transition group-hover:text-primary dark:text-zinc-100 dark:group-hover:text-sky-300">
+        {title}
+      </p>
+      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{categoryLabel}</p>
+    </Link>
+  );
+}
+
 function MobileNavSubLink({
   href,
   label,
@@ -922,7 +995,7 @@ function MobileNavSubLink({
     <Link
       href={href}
       onClick={onNavigate}
-      className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm font-medium text-zinc-700 transition hover:border-primary/20 hover:text-primary dark:border-zinc-700 dark:bg-zinc-800/90 dark:text-zinc-200 dark:hover:text-sky-300"
+      className="inline-flex items-center gap-1.5 px-1 py-1 text-sm font-medium text-zinc-700 transition hover:text-primary dark:text-zinc-200 dark:hover:text-sky-300"
     >
       <span>{label}</span>
       <ArrowRight className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
@@ -943,9 +1016,10 @@ function MobileNavChip({
     <Link
       href={href}
       onClick={onNavigate}
-      className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition hover:border-primary/25 hover:text-primary dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:text-sky-300"
+      className="inline-flex items-center gap-1.5 px-1 py-1 text-sm font-medium text-zinc-700 transition hover:text-primary dark:text-zinc-200 dark:hover:text-sky-300"
     >
-      {label}
+      <span>{label}</span>
+      <ArrowRight className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
     </Link>
   );
 }

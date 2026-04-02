@@ -4,14 +4,9 @@ import { siteConfig } from "@/lib/site";
 export default function HomePage() {
   return (
     <main className="relative flex min-h-screen w-full items-center px-6 py-16 sm:px-12 lg:px-24">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden dark:block">
-        <div className="absolute left-1/2 top-[4%] h-56 w-[28rem] -translate-x-1/2 rounded-full bg-sky-300/10 blur-3xl" />
-        <div className="absolute left-1/2 bottom-[2%] h-64 w-[32rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
-      </div>
-
       <section className="relative z-10 grid w-full items-center gap-10 lg:grid-cols-[minmax(420px,46vw)_minmax(0,1fr)] lg:gap-20">
         <div className="flex justify-center lg:justify-start">
-          <div className="hero-orb relative h-[20rem] w-[20rem] overflow-hidden rounded-full border border-zinc-200 bg-white shadow-[0_24px_80px_rgba(24,24,27,0.08)] dark:border-zinc-800 dark:bg-zinc-900/90 dark:shadow-[0_20px_60px_rgba(0,0,0,0.36)] sm:h-[24rem] sm:w-[24rem] lg:h-[30rem] lg:w-[30rem]">
+          <div className="relative h-[20rem] w-[20rem] overflow-hidden rounded-full sm:h-[24rem] sm:w-[24rem] lg:h-[30rem] lg:w-[30rem]">
             <Image
               src={siteConfig.avatar}
               alt={`${siteConfig.author} avatar`}

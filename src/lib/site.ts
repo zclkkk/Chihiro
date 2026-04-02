@@ -4,7 +4,7 @@ export const siteConfig = {
   name: "Chihiro",
   description: "A publishing system for stories, ideas, and product notes.",
   url: process.env.NEXT_PUBLIC_SITE_URL?.trim() || defaultSiteUrl,
-  avatar: "/avatar.JPG",
+  avatar: "/avatar.png",
   author: "Yinian",
   locale: "zh-CN",
   motto: "It is the time you have wasted for your rose makes your rose so important.",
