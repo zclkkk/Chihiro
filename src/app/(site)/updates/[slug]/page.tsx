@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getParagraphsFromContent } from "@/lib/content";
 import { RelativeDate } from "@/components/relative-date";
 import {
-  formatUpdateTerm,
-  getAllUpdateSlugs,
-  getPublishedUpdates,
-  getUpdateBySlug,
-} from "@/lib/updates";
+  getPublishedUpdateBySlug,
+  getPublishedUpdateSlugs,
+  listAllPublishedUpdates,
+} from "@/server/repositories/updates";
 
 type UpdatePageProps = {
   params: Promise<{
@@ -15,13 +15,14 @@ type UpdatePageProps = {
   }>;
 };
 
-export function generateStaticParams() {
-  return getAllUpdateSlugs().map((slug) => ({ slug }));
+export async function generateStaticParams() {
+  const slugs = await getPublishedUpdateSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({ params }: UpdatePageProps): Promise<Metadata> {
   const { slug } = await params;
-  const update = getUpdateBySlug(slug);
+  const update = await getPublishedUpdateBySlug(slug);
 
   if (!update) {
     return {
@@ -31,21 +32,22 @@ export async function generateMetadata({ params }: UpdatePageProps): Promise<Met
 
   return {
     title: `${update.title} | Update`,
-    description: update.summary,
+    description: update.summary ?? undefined,
   };
 }
 
 export default async function UpdatePage({ params }: UpdatePageProps) {
   const { slug } = await params;
-  const update = getUpdateBySlug(slug);
+  const update = await getPublishedUpdateBySlug(slug);
 
   if (!update) {
     notFound();
   }
 
-  const publishedUpdates = getPublishedUpdates();
+  const publishedUpdates = await listAllPublishedUpdates();
   const currentIndex = publishedUpdates.findIndex((item) => item.slug === update.slug);
-  const previousUpdate = currentIndex < publishedUpdates.length - 1 ? publishedUpdates[currentIndex + 1] : null;
+  const previousUpdate =
+    currentIndex < publishedUpdates.length - 1 ? publishedUpdates[currentIndex + 1] : null;
   const nextUpdate = currentIndex > 0 ? publishedUpdates[currentIndex - 1] : null;
 
   return (
@@ -59,8 +61,12 @@ export default async function UpdatePage({ params }: UpdatePageProps) {
         </Link>
 
         <div className="mt-8 flex flex-wrap items-center gap-3 text-xs font-medium uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
-          <span>{formatUpdateTerm(update.category)}</span>
-          <span>/</span>
+          {update.category ? (
+            <>
+              <span>{update.category.name}</span>
+              <span>/</span>
+            </>
+          ) : null}
           <span>Update</span>
         </div>
 
@@ -72,39 +78,50 @@ export default async function UpdatePage({ params }: UpdatePageProps) {
           <RelativeDate value={update.publishedAt} />
         </div>
 
-        <p className="mt-6 text-base leading-8 text-zinc-600 dark:text-zinc-300">
-          {update.summary}
-        </p>
+        {update.summary ? (
+          <p className="reading-copy mt-6 text-base leading-8 text-zinc-600 dark:text-zinc-300">
+            {update.summary}
+          </p>
+        ) : null}
 
         <div className="mt-8 flex flex-wrap gap-2">
-          <Link
-            href={`/updates?category=${encodeURIComponent(update.category)}`}
-            className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary dark:bg-sky-300/12 dark:text-sky-300"
-          >
-            {formatUpdateTerm(update.category)}
-          </Link>
+          {update.category ? (
+            <Link
+              href={`/updates?category=${encodeURIComponent(update.category.slug)}`}
+              className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary dark:bg-sky-300/12 dark:text-sky-300"
+            >
+              {update.category.name}
+            </Link>
+          ) : null}
           {update.tags.map((tag) => (
             <span
-              key={tag}
+              key={tag.id}
               className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
             >
-              #{formatUpdateTerm(tag)}
+              #{tag.name}
             </span>
           ))}
         </div>
 
-        <div className="mt-10 space-y-5 text-base leading-8 text-zinc-800 dark:text-zinc-200">
-          {update.content.map((paragraph) => (
-            <p key={paragraph}>{paragraph}</p>
-          ))}
-        </div>
+        {update.contentHtml ? (
+          <div
+            className="reading-copy mt-10 space-y-5 text-base leading-8 text-zinc-800 dark:text-zinc-200"
+            dangerouslySetInnerHTML={{ __html: update.contentHtml }}
+          />
+        ) : (
+          <div className="reading-copy mt-10 space-y-5 text-base leading-8 text-zinc-800 dark:text-zinc-200">
+            {getParagraphsFromContent(update.content).map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
+            ))}
+          </div>
+        )}
       </article>
 
       <div className="mt-14 grid gap-3 border-t border-zinc-200/80 pt-6 text-sm dark:border-zinc-800/80 sm:grid-cols-2">
         <div>
           {previousUpdate ? (
             <Link
-              href={previousUpdate.href}
+              href={`/updates/${previousUpdate.slug}`}
               className="group block rounded-[1.2rem] px-4 py-4 transition hover:bg-zinc-50 dark:hover:bg-zinc-900/70"
             >
               <p className="text-xs uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
@@ -119,7 +136,7 @@ export default async function UpdatePage({ params }: UpdatePageProps) {
         <div>
           {nextUpdate ? (
             <Link
-              href={nextUpdate.href}
+              href={`/updates/${nextUpdate.slug}`}
               className="group block rounded-[1.2rem] px-4 py-4 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-900/70 sm:text-right"
             >
               <p className="text-xs uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">

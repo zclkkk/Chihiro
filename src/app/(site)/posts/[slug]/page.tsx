@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getParagraphsFromContent } from "@/lib/content";
 import { RelativeDate } from "@/components/relative-date";
-import { formatPostTerm, getAllPostSlugs, getPostBySlug } from "@/lib/posts";
+import { getPublishedPostBySlug, getPublishedPostSlugs } from "@/server/repositories/posts";
 
 type PostPageProps = {
   params: Promise<{
@@ -10,15 +11,14 @@ type PostPageProps = {
   }>;
 };
 
-export function generateStaticParams() {
-  return getAllPostSlugs().map((slug) => ({ slug }));
+export async function generateStaticParams() {
+  const slugs = await getPublishedPostSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
-export async function generateMetadata({
-  params,
-}: PostPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: PostPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const post = await getPublishedPostBySlug(slug);
 
   if (!post) {
     return {
@@ -28,13 +28,13 @@ export async function generateMetadata({
 
   return {
     title: post.title,
-    description: post.description,
+    description: post.summary ?? undefined,
   };
 }
 
 export default async function PostPage({ params }: PostPageProps) {
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const post = await getPublishedPostBySlug(slug);
 
   if (!post) {
     notFound();
@@ -44,7 +44,7 @@ export default async function PostPage({ params }: PostPageProps) {
     <main className="mx-auto min-h-screen w-full max-w-3xl px-6 py-16 sm:px-10">
       <article>
         <p className="text-sm uppercase tracking-[0.28em] text-zinc-500 dark:text-zinc-400">
-          {post.authorName}
+          {post.authorName ?? "Unknown author"}
         </p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
           {post.title}
@@ -58,31 +58,42 @@ export default async function PostPage({ params }: PostPageProps) {
           ) : null}
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
-          <Link
-            href={`/posts?category=${encodeURIComponent(post.category)}`}
-            className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary dark:bg-sky-400/10 dark:text-sky-300"
-          >
-            {formatPostTerm(post.category)}
-          </Link>
+          {post.category ? (
+            <Link
+              href={`/posts?category=${encodeURIComponent(post.category.slug)}`}
+              className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary dark:bg-sky-400/10 dark:text-sky-300"
+            >
+              {post.category.name}
+            </Link>
+          ) : null}
           {post.tags.map((tag) => (
             <Link
-              key={tag}
-              href={`/posts?tag=${encodeURIComponent(tag)}`}
+              key={tag.id}
+              href={`/posts?tag=${encodeURIComponent(tag.slug)}`}
               className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
             >
-              {formatPostTerm(tag)}
+              {tag.name}
             </Link>
           ))}
         </div>
-        <p className="mt-6 text-lg leading-8 text-zinc-600 dark:text-zinc-300">
-          {post.description}
-        </p>
+        {post.summary ? (
+          <p className="reading-copy mt-6 text-lg leading-8 text-zinc-600 dark:text-zinc-300">
+            {post.summary}
+          </p>
+        ) : null}
 
-        <div className="mt-10 space-y-6 text-base leading-8 text-zinc-800 dark:text-zinc-200">
-          {post.content.map((paragraph) => (
-            <p key={paragraph}>{paragraph}</p>
-          ))}
-        </div>
+        {post.contentHtml ? (
+          <div
+            className="reading-copy mt-10 space-y-6 text-base leading-8 text-zinc-800 dark:text-zinc-200"
+            dangerouslySetInnerHTML={{ __html: post.contentHtml }}
+          />
+        ) : (
+          <div className="reading-copy mt-10 space-y-6 text-base leading-8 text-zinc-800 dark:text-zinc-200">
+            {getParagraphsFromContent(post.content).map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
+            ))}
+          </div>
+        )}
       </article>
     </main>
   );

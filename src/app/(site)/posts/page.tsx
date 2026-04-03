@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { formatContentTerm, getContentText } from "@/lib/content";
 import { SearchDialog } from "@/components/search-dialog";
 import { PostTagsPanel } from "@/components/post-tags-panel";
 import { RelativeDate } from "@/components/relative-date";
-import { formatPostTerm, getPublishedPosts } from "@/lib/posts";
+import { listAllPublishedPosts } from "@/server/repositories/posts";
 
 type PostsPageProps = {
   searchParams: Promise<{
@@ -13,6 +14,8 @@ type PostsPageProps = {
   }>;
 };
 
+type PublishedPost = Awaited<ReturnType<typeof listAllPublishedPosts>>[number];
+
 export default async function PostsPage({ searchParams }: PostsPageProps) {
   const { category, tag, sort, page } = await searchParams;
   const selectedTags = Array.from(
@@ -20,19 +23,23 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
   );
   const activeSort = getSortValue(sort);
   const currentPage = getPageValue(page);
-  const allPosts = getPublishedPosts();
+  const allPosts = await listAllPublishedPosts();
 
   const filteredPosts = allPosts.filter((post) => {
-    if (category && post.category !== category) {
+    if (category && post.category?.slug !== category) {
       return false;
     }
 
-    if (selectedTags.length > 0 && !selectedTags.every((item) => post.tags.includes(item))) {
+    if (
+      selectedTags.length > 0 &&
+      !selectedTags.every((item) => post.tags.some((tagItem) => tagItem.slug === item))
+    ) {
       return false;
     }
 
     return true;
   });
+
   const publishedPosts = sortPosts(filteredPosts, activeSort);
   const totalPages = Math.max(1, Math.ceil(publishedPosts.length / POSTS_PER_PAGE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -42,9 +49,9 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
   );
 
   const activeFilters = [
-    ...(category ? [`Category: ${formatPostTerm(category)}`] : []),
+    ...(category ? [`Category: ${getCategoryFilterLabel(category, allPosts)}`] : []),
     ...(selectedTags.length > 0
-      ? [`Tags: ${selectedTags.map((item) => formatPostTerm(item)).join(", ")}`]
+      ? [`Tags: ${selectedTags.map((item) => getTagFilterLabel(item, allPosts)).join(", ")}`]
       : []),
     ...(activeSort !== "latest"
       ? [
@@ -162,33 +169,35 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
                 <h2 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
                   <Link href={`/posts/${post.slug}`}>{post.title}</Link>
                 </h2>
-                <p className="mt-3 text-sm leading-7 text-zinc-600 dark:text-zinc-300">
-                  {post.description}
+                <p className="reading-copy mt-3 text-sm leading-7 text-zinc-600 dark:text-zinc-300">
+                  {post.summary ?? "No summary yet."}
                 </p>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap gap-2">
-                    <Link
-                      href={buildPostsHref({ nextCategory: post.category })}
-                      className="text-xs font-medium text-primary transition hover:opacity-80 dark:text-sky-300"
-                    >
-                      / {formatPostTerm(post.category)}
-                    </Link>
+                    {post.category ? (
+                      <Link
+                        href={buildPostsHref({ nextCategory: post.category.slug })}
+                        className="text-xs font-medium text-primary transition hover:opacity-80 dark:text-sky-300"
+                      >
+                        / {post.category.name}
+                      </Link>
+                    ) : null}
                     {post.tags.map((item) => (
                       <Link
-                        key={item}
+                        key={item.id}
                         href={buildPostsHref({
-                          nextTags: Array.from(new Set([...selectedTags, item])),
+                          nextTags: Array.from(new Set([...selectedTags, item.slug])),
                         })}
                         className="text-xs font-medium text-zinc-500 transition hover:text-primary dark:text-zinc-400 dark:hover:text-sky-300"
                       >
-                        #{formatPostTerm(item)}
+                        #{item.name}
                       </Link>
                     ))}
                   </div>
                   <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
                     <RelativeDate value={post.publishedAt} />
                     <span>·</span>
-                    <span>{post.authorName}</span>
+                    <span>{post.authorName ?? "Unknown author"}</span>
                   </div>
                 </div>
               </article>
@@ -266,15 +275,15 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
                   href: `/posts/${post.slug}`,
                   title: post.title,
                   publishedAt: post.publishedAt,
-                  overline: formatPostTerm(post.category),
-                  preview: post.description,
+                  overline: post.category?.name ?? "Uncategorized",
+                  preview: post.summary ?? getContentPreview(post.contentHtml, post.content),
                   searchText: [
                     post.title,
-                    post.description,
-                    formatPostTerm(post.category),
-                    post.authorName,
-                    ...post.tags.map((item) => formatPostTerm(item)),
-                    ...post.content,
+                    post.summary ?? "",
+                    post.category?.name ?? "",
+                    post.authorName ?? "",
+                    ...post.tags.map((item) => item.name),
+                    getContentText(post.contentHtml, post.content),
                   ].join(" "),
                 }))}
               />
@@ -311,7 +320,7 @@ function getSortValue(value?: string): SortValue {
   return "latest";
 }
 
-function sortPosts(posts: ReturnType<typeof getPublishedPosts>, sort: SortValue) {
+function sortPosts(posts: PublishedPost[], sort: SortValue) {
   const nextPosts = [...posts];
 
   if (sort === "earliest") {
@@ -371,15 +380,17 @@ function getVisiblePageItems(currentPage: number, totalPages: number) {
 }
 
 function getTagItems(
-  posts: ReturnType<typeof getPublishedPosts>,
+  posts: PublishedPost[],
   selectedTags: string[],
   buildHref: (tagSlug: string) => string,
 ) {
   const tagCounts = new Map<string, number>();
+  const tagLabels = new Map<string, string>();
 
   for (const post of posts) {
     for (const tag of post.tags) {
-      tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+      tagCounts.set(tag.slug, (tagCounts.get(tag.slug) ?? 0) + 1);
+      tagLabels.set(tag.slug, tag.name);
     }
   }
 
@@ -387,9 +398,21 @@ function getTagItems(
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
     .map(([slug, count]) => ({
       slug,
-      label: formatPostTerm(slug),
+      label: tagLabels.get(slug) ?? formatContentTerm(slug),
       href: buildHref(slug),
       count,
       isActive: selectedTags.includes(slug),
     }));
+}
+
+function getCategoryFilterLabel(slug: string, posts: PublishedPost[]) {
+  return posts.find((post) => post.category?.slug === slug)?.category?.name ?? formatContentTerm(slug);
+}
+
+function getTagFilterLabel(slug: string, posts: PublishedPost[]) {
+  return posts.flatMap((post) => post.tags).find((tag) => tag.slug === slug)?.name ?? formatContentTerm(slug);
+}
+
+function getContentPreview(contentHtml: string | null, content: unknown) {
+  return getContentText(contentHtml, content) || "No preview available yet.";
 }

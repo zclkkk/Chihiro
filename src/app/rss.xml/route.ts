@@ -1,8 +1,9 @@
-import { getPublishedPosts } from "@/lib/posts";
+import { getContentText } from "@/lib/content";
 import { absoluteUrl, siteConfig } from "@/lib/site";
+import { listAllPublishedPosts } from "@/server/repositories/posts";
 
-export function GET() {
-  const posts = getPublishedPosts();
+export async function GET() {
+  const posts = await listAllPublishedPosts();
   const feedUrl = absoluteUrl("/rss.xml");
   const siteUrl = absoluteUrl("/");
 
@@ -10,9 +11,9 @@ export function GET() {
     .map((post) => {
       const postUrl = absoluteUrl(`/posts/${post.slug}`);
       const pubDate = new Date(post.publishedAt ?? Date.now()).toUTCString();
-      const description = escapeXml(post.description);
+      const description = escapeXml(post.summary ?? "");
       const title = escapeXml(post.title);
-      const content = escapeXml(post.content.join("\n\n"));
+      const content = post.contentHtml ?? escapeXml(getContentText(null, post.content));
 
       return `
         <item>

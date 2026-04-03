@@ -1,10 +1,11 @@
 import Link from "next/link";
+import { getContentText } from "@/lib/content";
 import { ArchiveTimeline, type ArchiveYearGroup } from "@/components/archive-timeline";
 import { SearchDialog } from "@/components/search-dialog";
 import { ScrollToTopLink } from "@/components/scroll-to-top-link";
 import { SiteLogoMark } from "@/components/site-logo-mark";
-import { formatPostTerm, getPublishedPosts } from "@/lib/posts";
-import { formatUpdateTerm, getPublishedUpdates } from "@/lib/updates";
+import { listAllPublishedPosts } from "@/server/repositories/posts";
+import { listAllPublishedUpdates } from "@/server/repositories/updates";
 
 type ArchivesPageProps = {
   searchParams: Promise<{
@@ -35,12 +36,15 @@ const archiveTypes: Array<{ value: ArchiveType; label: string }> = [
 export default async function ArchivesPage({ searchParams }: ArchivesPageProps) {
   const { type } = await searchParams;
   const archiveType = normalizeArchiveType(type);
-  const items = getArchiveItems(archiveType);
+  const [posts, updates] = await Promise.all([listAllPublishedPosts(), listAllPublishedUpdates()]);
+  const items = getArchiveItems(archiveType, posts, updates);
   const groups = groupArchiveItemsByYearAndMonth(items);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-6 py-16 sm:px-10">
-      <p className="text-sm uppercase tracking-[0.28em] text-zinc-500 dark:text-zinc-400">Archives</p>
+      <p className="text-sm uppercase tracking-[0.28em] text-zinc-500 dark:text-zinc-400">
+        Archives
+      </p>
       <h1 className="mt-4 text-4xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
         归档
       </h1>
@@ -111,41 +115,45 @@ function normalizeArchiveType(value?: string): ArchiveType {
   return "all";
 }
 
-function getArchiveItems(type: ArchiveType): ArchiveItem[] {
-  const postItems: ArchiveItem[] = getPublishedPosts().map((post) => ({
+function getArchiveItems(
+  type: ArchiveType,
+  posts: Awaited<ReturnType<typeof listAllPublishedPosts>>,
+  updates: Awaited<ReturnType<typeof listAllPublishedUpdates>>,
+): ArchiveItem[] {
+  const postItems: ArchiveItem[] = posts.map((post) => ({
     id: post.id,
     href: `/posts/${post.slug}`,
     title: post.title,
     publishedAt: post.publishedAt,
-    categoryLabel: formatPostTerm(post.category),
+    categoryLabel: post.category?.name ?? "Uncategorized",
     kindLabel: "Posts",
-    meta: post.authorName,
-    summary: post.description,
+    meta: post.authorName ?? undefined,
+    summary: post.summary ?? "",
     searchText: [
       post.title,
-      post.description,
-      formatPostTerm(post.category),
-      post.authorName,
-      ...post.tags.map((tag) => formatPostTerm(tag)),
-      ...post.content,
+      post.summary ?? "",
+      post.category?.name ?? "",
+      post.authorName ?? "",
+      ...post.tags.map((tag) => tag.name),
+      getContentText(post.contentHtml, post.content),
     ].join(" "),
   }));
 
-  const updateItems: ArchiveItem[] = getPublishedUpdates().map((update) => ({
+  const updateItems: ArchiveItem[] = updates.map((update) => ({
     id: update.id,
-    href: update.href,
+    href: `/updates/${update.slug}`,
     title: update.title,
     publishedAt: update.publishedAt,
-    categoryLabel: formatUpdateTerm(update.category),
+    categoryLabel: update.category?.name ?? "Uncategorized",
     kindLabel: "Updates",
-    summary: formatUpdateTerm(update.category),
+    summary: update.summary ?? "",
     searchText: [
       update.title,
-      update.summary,
-      formatUpdateTerm(update.category),
+      update.summary ?? "",
+      update.category?.name ?? "",
       "Updates",
-      ...update.tags.map((tag) => formatUpdateTerm(tag)),
-      ...update.content,
+      ...update.tags.map((tag) => tag.name),
+      getContentText(update.contentHtml, update.content),
     ].join(" "),
   }));
 

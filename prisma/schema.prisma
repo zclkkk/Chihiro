@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CategoryKind {
+  POST
+  UPDATE
+}
+
+enum AssetKind {
+  IMAGE
+  VIDEO
+  FILE
+}
+
+enum AssetProvider {
+  S3
+  R2
+  LOCAL
+}
+
+model Post {
+  id            String        @id @default(cuid())
+  title         String
+  slug          String        @unique
+  summary       String?
+  status        ContentStatus @default(DRAFT)
+  content       Json?
+  contentHtml   String?
+  authorName    String?
+  publishedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  categoryId    String?
+  coverAssetId  String?
+  category      Category?     @relation("PostCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  coverAsset    Asset?        @relation("PostCoverAsset", fields: [coverAssetId], references: [id], onDelete: SetNull)
+  tags          PostTag[]
+
+  @@index([status, publishedAt])
+  @@index([categoryId])
+}
+
+model Update {
+  id            String        @id @default(cuid())
+  title         String
+  slug          String        @unique
+  summary       String?
+  status        ContentStatus @default(DRAFT)
+  content       Json?
+  contentHtml   String?
+  publishedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  categoryId    String?
+  coverAssetId  String?
+  category      Category?     @relation("UpdateCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  coverAsset    Asset?        @relation("UpdateCoverAsset", fields: [coverAssetId], references: [id], onDelete: SetNull)
+  tags          UpdateTag[]
+
+  @@index([status, publishedAt])
+  @@index([categoryId])
+}
+
+model Asset {
+  id             String        @id @default(cuid())
+  provider       AssetProvider
+  kind           AssetKind
+  storageKey     String        @unique
+  bucket         String?
+  url            String
+  alt            String?
+  mimeType       String?
+  size           Int?
+  width          Int?
+  height         Int?
+  duration       Int?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  postCovers     Post[]        @relation("PostCoverAsset")
+  updateCovers   Update[]      @relation("UpdateCoverAsset")
+}
+
+model Category {
+  id        String       @id @default(cuid())
+  kind      CategoryKind
+  name      String
+  slug      String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  posts     Post[]       @relation("PostCategory")
+  updates   Update[]     @relation("UpdateCategory")
+
+  @@unique([kind, slug])
+  @@index([kind, name])
+}
+
+model Tag {
+  id        String      @id @default(cuid())
+  name      String
+  slug      String      @unique
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  posts     PostTag[]
+  updates   UpdateTag[]
+}
+
+model PostTag {
+  postId      String
+  tagId       String
+  assignedAt  DateTime @default(now())
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag         Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@index([tagId])
+}
+
+model UpdateTag {
+  updateId    String
+  tagId       String
+  assignedAt  DateTime @default(now())
+  update      Update   @relation(fields: [updateId], references: [id], onDelete: Cascade)
+  tag         Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([updateId, tagId])
+  @@index([tagId])
+}
+
+model SiteSettings {
+  id                String   @id @default("default")
+  siteName          String
+  siteDescription   String
+  siteUrl           String
+  locale            String   @default("zh-CN")
+  authorName        String
+  authorAvatarUrl   String?
+  summary           String?
+  motto             String?
+  email             String?
+  githubUrl         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}

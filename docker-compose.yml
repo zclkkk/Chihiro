@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chihiro-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: chihiro
+      POSTGRES_USER: chihiro
+      POSTGRES_PASSWORD: chihiro
+    volumes:
+      - chihiro-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chihiro -d chihiro"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  chihiro-postgres-data:

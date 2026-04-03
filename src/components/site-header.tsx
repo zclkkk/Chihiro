@@ -19,9 +19,7 @@ import {
 } from "lucide-react";
 import { RelativeDate } from "@/components/relative-date";
 import { ThemeModeToggle } from "@/components/theme-mode-toggle";
-import { formatPostTerm, getPublishedPosts } from "@/lib/posts";
 import { siteConfig } from "@/lib/site";
-import { formatUpdateTerm, getPublishedUpdates } from "@/lib/updates";
 
 const navItems = [
   {
@@ -56,35 +54,25 @@ const navItems = [
   },
 ];
 
-const publishedPosts = getPublishedPosts();
-const publishedUpdates = getPublishedUpdates();
-const postCategories = Array.from(
-  new Set(publishedPosts.map((post) => post.category)),
-)
-  .map((category) => ({
-    slug: category,
-    label: formatPostTerm(category),
-    href: `/posts?category=${encodeURIComponent(category)}`,
-    posts: publishedPosts.filter((post) => post.category === category),
-  }))
-  .sort((a, b) => b.posts.length - a.posts.length || a.label.localeCompare(b.label));
+export type SiteHeaderPostCategory = {
+  slug: string;
+  label: string;
+  href: string;
+  posts: Array<{
+    id: string;
+    slug: string;
+    title: string;
+  }>;
+};
 
-const updateCategories = Array.from(
-  new Set(publishedUpdates.map((update) => update.category)),
-)
-  .map((category) => {
-    const items = publishedUpdates.filter((update) => update.category === category);
+export type SiteHeaderUpdateCategory = {
+  tag: string;
+  label: string;
+  href: string;
+  items: string[];
+};
 
-    return {
-      tag: category,
-      label: formatUpdateTerm(category),
-      href: `/updates?category=${encodeURIComponent(category)}`,
-      items: items.map((item) => item.title),
-    };
-  })
-  .sort((a, b) => b.items.length - a.items.length || a.label.localeCompare(b.label));
-
-type RecentArchiveItem = {
+export type SiteHeaderRecentArchiveItem = {
   id: string;
   href: string;
   title: string;
@@ -93,31 +81,6 @@ type RecentArchiveItem = {
   kind: "文章" | "动态";
 };
 
-const recentArchiveItems: RecentArchiveItem[] = [
-  ...publishedPosts.map((post) => ({
-    id: post.id,
-    href: `/posts/${post.slug}`,
-    title: post.title,
-    categoryLabel: formatPostTerm(post.category),
-    publishedAt: post.publishedAt,
-    kind: "文章" as const,
-  })),
-  ...publishedUpdates.map((item) => ({
-    id: item.id,
-    href: item.href,
-    title: item.title,
-    categoryLabel: formatUpdateTerm(item.category),
-    publishedAt: item.publishedAt,
-    kind: "动态" as const,
-  })),
-]
-  .sort((a, b) => {
-    const aTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
-    const bTime = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
-    return bTime - aTime;
-  })
-  .slice(0, 5);
-
 const morePlaceholders = [
   { eyebrow: "Projects", title: "项目" },
   { eyebrow: "Friends", title: "友链" },
@@ -125,7 +88,17 @@ const morePlaceholders = [
   { eyebrow: "Bookmarks", title: "书签" },
 ];
 
-export function SiteHeader() {
+type SiteHeaderProps = {
+  postCategories: SiteHeaderPostCategory[];
+  updateCategories: SiteHeaderUpdateCategory[];
+  recentArchiveItems: SiteHeaderRecentArchiveItem[];
+};
+
+export function SiteHeader({
+  postCategories,
+  updateCategories,
+  recentArchiveItems,
+}: SiteHeaderProps) {
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileBrandVisible, setIsMobileBrandVisible] = useState(true);
@@ -383,6 +356,9 @@ export function SiteHeader() {
                 >
                   <div className="rounded-[1.5rem] border border-zinc-200/80 bg-white/92 p-3 shadow-[0_20px_60px_rgba(24,24,27,0.14)] backdrop-blur-xl dark:border-zinc-800/70 dark:bg-[rgba(10,10,14,0.82)] dark:shadow-[0_24px_70px_rgba(0,0,0,0.48)]">
                     {renderMegaNavContent(featuredItem.href, {
+                      postCategories,
+                      updateCategories,
+                      recentArchiveItems,
                       hoveredPostCategorySlug,
                       onHoverPostCategory: setHoveredPostCategorySlug,
                       hoveredUpdateCategoryTag,
@@ -492,8 +468,14 @@ export function SiteHeader() {
                             className="overflow-hidden"
                           >
                             <div className="px-3.5 pb-3">
-                              {renderMobileNavContent(item.href, () =>
-                                setIsMobileNavOpen(false),
+                              {renderMobileNavContent(
+                                item.href,
+                                {
+                                  postCategories,
+                                  updateCategories,
+                                  recentArchiveItems,
+                                },
+                                () => setIsMobileNavOpen(false),
                               )}
                             </div>
                           </motion.div>
@@ -525,6 +507,9 @@ function isActivePath(pathname: string, href: string) {
 function renderMegaNavContent(
   href: string,
   options: {
+    postCategories: SiteHeaderPostCategory[];
+    updateCategories: SiteHeaderUpdateCategory[];
+    recentArchiveItems: SiteHeaderRecentArchiveItem[];
     hoveredPostCategorySlug: string | null;
     onHoverPostCategory: (slug: string) => void;
     hoveredUpdateCategoryTag: string | null;
@@ -552,6 +537,7 @@ function renderMegaNavContent(
       return (
         <MegaNavSection eyebrow="Categories">
           <PostMegaNavContent
+            postCategories={options.postCategories}
             hoveredPostCategorySlug={options.hoveredPostCategorySlug}
             onHoverPostCategory={options.onHoverPostCategory}
             onNavigate={options.onNavigate}
@@ -562,6 +548,7 @@ function renderMegaNavContent(
       return (
         <MegaNavSection eyebrow="Categories">
           <UpdateMegaNavContent
+            updateCategories={options.updateCategories}
             hoveredUpdateCategoryTag={options.hoveredUpdateCategoryTag}
             onHoverUpdateCategory={options.onHoverUpdateCategory}
             onNavigate={options.onNavigate}
@@ -578,7 +565,7 @@ function renderMegaNavContent(
               </p>
             </div>
             <div className="grid gap-1">
-              {recentArchiveItems.map((item) => (
+              {options.recentArchiveItems.map((item) => (
                 <MegaNavRecentEntry
                   key={item.id}
                   href={item.href}
@@ -629,7 +616,15 @@ function renderMegaNavContent(
   }
 }
 
-function renderMobileNavContent(href: string, onNavigate: () => void) {
+function renderMobileNavContent(
+  href: string,
+  navigationData: {
+    postCategories: SiteHeaderPostCategory[];
+    updateCategories: SiteHeaderUpdateCategory[];
+    recentArchiveItems: SiteHeaderRecentArchiveItem[];
+  },
+  onNavigate: () => void,
+) {
   switch (href) {
     case "/":
       return (
@@ -642,7 +637,7 @@ function renderMobileNavContent(href: string, onNavigate: () => void) {
     case "/posts":
       return (
         <div className="flex flex-wrap gap-2">
-          {postCategories.map((category) => (
+          {navigationData.postCategories.map((category) => (
             <MobileNavChip
               key={category.href}
               href={category.href}
@@ -655,7 +650,7 @@ function renderMobileNavContent(href: string, onNavigate: () => void) {
     case "/updates":
       return (
         <div className="flex flex-wrap gap-2">
-          {updateCategories.map((category) => (
+          {navigationData.updateCategories.map((category) => (
             <MobileNavChip
               key={category.href}
               href={category.href}
@@ -668,11 +663,11 @@ function renderMobileNavContent(href: string, onNavigate: () => void) {
     case "/archives":
       return (
         <div className="grid gap-2">
-          {publishedPosts.slice(0, 3).map((post) => (
+          {navigationData.recentArchiveItems.slice(0, 3).map((item) => (
             <MobileNavSubLink
-              key={post.id}
-              href={`/posts/${post.slug}`}
-              label={post.title}
+              key={item.id}
+              href={item.href}
+              label={item.title}
               onNavigate={onNavigate}
             />
           ))}
@@ -731,10 +726,12 @@ function MegaNavLinkCard({
 }
 
 function PostMegaNavContent({
+  postCategories,
   hoveredPostCategorySlug,
   onHoverPostCategory,
   onNavigate,
 }: {
+  postCategories: SiteHeaderPostCategory[];
   hoveredPostCategorySlug: string | null;
   onHoverPostCategory: (slug: string) => void;
   onNavigate: () => void;
@@ -805,10 +802,12 @@ function PostMegaNavContent({
 }
 
 function UpdateMegaNavContent({
+  updateCategories,
   hoveredUpdateCategoryTag,
   onHoverUpdateCategory,
   onNavigate,
 }: {
+  updateCategories: SiteHeaderUpdateCategory[];
   hoveredUpdateCategoryTag: string | null;
   onHoverUpdateCategory: (tag: string) => void;
   onNavigate: () => void;
@@ -910,36 +909,6 @@ function MegaNavArticleLink({
       className="group flex items-center justify-between gap-3 rounded-[0.95rem] px-2 py-2 transition-colors duration-200 hover:bg-zinc-50/90 hover:text-primary dark:hover:bg-zinc-900/70 dark:hover:text-sky-300"
     >
       <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{title}</p>
-      <ArrowRight className="h-3.5 w-3.5 text-zinc-400 transition group-hover:translate-x-0.5 group-hover:text-primary dark:text-zinc-500 dark:group-hover:text-sky-300" />
-    </Link>
-  );
-}
-
-function MegaNavArchiveEntry({
-  href,
-  title,
-  meta,
-  dateValue,
-  onNavigate,
-}: {
-  href: string;
-  title: string;
-  meta: string;
-  dateValue?: string | null;
-  onNavigate: () => void;
-}) {
-  return (
-    <Link
-      href={href}
-      onClick={onNavigate}
-      className="group grid grid-cols-[5.25rem_minmax(0,1fr)_auto] items-center gap-3 rounded-[0.95rem] px-2 py-2 transition-colors duration-200 hover:bg-zinc-50/90 dark:hover:bg-zinc-900/70"
-    >
-      <span className="text-xs font-medium tracking-[0.08em] text-zinc-400 dark:text-zinc-500">
-        {dateValue ? <RelativeDate value={dateValue} /> : meta}
-      </span>
-      <span className="truncate text-sm font-medium text-zinc-900 transition group-hover:text-primary dark:text-zinc-100 dark:group-hover:text-sky-300">
-        {title}
-      </span>
       <ArrowRight className="h-3.5 w-3.5 text-zinc-400 transition group-hover:translate-x-0.5 group-hover:text-primary dark:text-zinc-500 dark:group-hover:text-sky-300" />
     </Link>
   );

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { RelativeDate } from "@/components/relative-date";
 
 type ArchiveItem = {
   id: string;
