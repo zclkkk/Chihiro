@@ -18,7 +18,7 @@ type PostRecord = Prisma.PostGetPayload<{
 export type PostListSort = "latest" | "earliest" | "updated";
 
 export type PostItem = {
-  id: string;
+  id: number;
   title: string;
   slug: string;
   summary: string | null;
@@ -29,8 +29,10 @@ export type PostItem = {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  publishedSnapshot: PublishedPostSnapshot | null;
+  draftSnapshot: DraftPostSnapshot | null;
   category: {
-    id: string;
+    id: number;
     name: string;
     slug: string;
   } | null;
@@ -61,6 +63,27 @@ type TagSummary = {
   slug: string;
 };
 
+type PublishedPostSnapshot = {
+  title: string;
+  slug: string;
+  summary: string | null;
+  content: Prisma.JsonValue | null;
+  contentHtml: string | null;
+  authorName: string | null;
+  publishedAt: string | null;
+  category: {
+    id: number;
+    name: string;
+    slug: string;
+  } | null;
+  coverAsset: AssetSummary | null;
+  tags: TagSummary[];
+};
+
+type DraftPostSnapshot = PublishedPostSnapshot & {
+  savedAt: string;
+};
+
 export type ListPublishedPostsOptions = {
   page?: number;
   pageSize?: number;
@@ -79,25 +102,172 @@ export async function listPostsForAdmin(): Promise<PostItem[]> {
   return items.map(mapPostRecord);
 }
 
+export async function getPostByIdForAdmin(id: number): Promise<PostItem | null> {
+  const post = await prisma.post.findUnique({
+    where: { id },
+    include: postInclude,
+  });
+
+  return post ? mapPostRecord(post) : null;
+}
+
+export type SavePostDraftInput = {
+  id?: number;
+  title: string;
+  slug: string | null;
+  summary: string | null;
+  content: string | null;
+  contentHtml: string | null;
+  status: ContentStatus;
+  categoryId: number | null;
+  publishedAt: Date | null;
+  tagIds: string[];
+  authorName: string | null;
+};
+
+export async function savePostDraft(input: SavePostDraftInput): Promise<PostItem> {
+  const tagIds = Array.from(new Set(input.tagIds.filter(Boolean)));
+  const resolvedSlug = input.slug ?? (typeof input.id === "number" ? String(input.id) : null);
+  if (typeof input.id === "number" && input.status === ContentStatus.PUBLISHED) {
+    const current = await prisma.post.findUnique({
+      where: { id: input.id },
+      include: postInclude,
+    });
+
+    if (!current) {
+      throw new Error(`Post not found: ${input.id}`);
+    }
+
+    const category = input.categoryId
+      ? await prisma.category.findUnique({
+          where: { id: input.categoryId },
+          select: { id: true, name: true, slug: true },
+        })
+      : null;
+    const tags =
+      tagIds.length > 0
+        ? await prisma.tag.findMany({
+            where: { id: { in: tagIds } },
+            select: { id: true, name: true, slug: true },
+          })
+        : [];
+
+    const draftSnapshot = buildDraftSnapshot({
+      title: input.title,
+      slug: resolvedSlug ?? current.slug,
+      summary: input.summary,
+      content: input.content,
+      contentHtml: input.contentHtml,
+      authorName: input.authorName,
+      publishedAt: input.publishedAt,
+      category,
+      coverAsset: current.coverAsset,
+      tags,
+    });
+
+    const post = await prisma.post.update({
+      where: { id: input.id },
+      data: {
+        draftSnapshot,
+      },
+      include: postInclude,
+    });
+
+    return mapPostRecord(post);
+  }
+
+  const baseData = {
+    title: input.title,
+    summary: input.summary,
+    content: input.content ?? Prisma.DbNull,
+    contentHtml: input.contentHtml,
+    authorName: input.authorName,
+    publishedAt: input.publishedAt,
+    status: input.status,
+  };
+  const nextTags =
+    tagIds.length > 0
+      ? {
+          create: tagIds.map((tagId) => ({
+            tag: {
+              connect: { id: tagId },
+            },
+          })),
+        }
+      : {};
+  const updateData = {
+    ...baseData,
+    slug: resolvedSlug ?? undefined,
+    category: input.categoryId
+      ? {
+          connect: { id: input.categoryId },
+        }
+      : {
+          disconnect: true,
+        },
+    tags: {
+      deleteMany: {},
+      ...nextTags,
+    },
+  } satisfies Prisma.PostUpdateInput;
+  const createData = {
+    ...baseData,
+    slug: resolvedSlug ?? createTemporarySlug(),
+    ...(input.categoryId
+      ? {
+          category: {
+            connect: { id: input.categoryId },
+          },
+        }
+      : {}),
+    ...(tagIds.length > 0
+      ? {
+          tags: nextTags,
+        }
+      : {}),
+  } satisfies Prisma.PostCreateInput;
+
+  const post = input.id
+    ? await prisma.post.update({
+        where: { id: input.id },
+        data: {
+          ...updateData,
+          draftSnapshot: Prisma.DbNull,
+        },
+        include: postInclude,
+      })
+    : await prisma.post.create({
+        data: createData,
+        include: postInclude,
+      });
+
+  if (typeof input.id !== "number" && !input.slug && post.slug !== String(post.id)) {
+    const updatedPost = await prisma.post.update({
+      where: { id: post.id },
+      data: {
+        slug: String(post.id),
+      },
+      include: postInclude,
+    });
+
+    return mapPostRecord(updatedPost);
+  }
+
+  return mapPostRecord(post);
+}
+
 export async function listPublishedPosts(
   options: ListPublishedPostsOptions = {},
 ): Promise<PostListResult> {
   const pageSize = getSafePageSize(options.pageSize);
   const page = getSafePage(options.page);
-  const where = buildPublishedPostWhere(options);
-  const [items, totalCount] = await Promise.all([
-    prisma.post.findMany({
-      where,
-      include: postInclude,
-      orderBy: getPostOrderBy(options.sort),
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-    prisma.post.count({ where }),
-  ]);
+  const items = await listAllPublishedPosts(options);
+  const totalCount = items.length;
+  const sortedItems = sortPublishedPosts(items, options.sort);
+  const paginatedItems = sortedItems.slice((page - 1) * pageSize, page * pageSize);
 
   return {
-    items: items.map(mapPostRecord),
+    items: paginatedItems,
     page,
     pageSize,
     totalCount,
@@ -108,28 +278,44 @@ export async function listPublishedPosts(
 export async function listAllPublishedPosts(
   options: Omit<ListPublishedPostsOptions, "page" | "pageSize"> = {},
 ): Promise<PostItem[]> {
-  const items = await prisma.post.findMany({
-    where: buildPublishedPostWhere(options),
-    include: postInclude,
-    orderBy: getPostOrderBy(options.sort),
-  });
-
-  return items.map(mapPostRecord);
-}
-
-export async function getPublishedPostBySlug(slug: string): Promise<PostItem | null> {
-  const post = await prisma.post.findFirst({
+  const records = await prisma.post.findMany({
     where: {
-      slug,
       status: ContentStatus.PUBLISHED,
     },
     include: postInclude,
   });
 
-  return post ? mapPostRecord(post) : null;
+  const items = records.map(mapPublishedPostRecord);
+  return filterPublishedPosts(items, options);
 }
 
-export async function publishPostById(id: string): Promise<PostItem> {
+export async function getPublishedPostBySlug(slug: string): Promise<PostItem | null> {
+  const post = await listAllPublishedPosts();
+  const found = post.find((item) => item.slug === slug);
+
+  return found ?? null;
+}
+
+export async function getPublishedPostByCategoryAndSlug(
+  categorySlug: string,
+  slug: string,
+): Promise<PostItem | null> {
+  const post = await getPublishedPostBySlug(slug);
+
+  if (!post) {
+    return null;
+  }
+
+  const expectedCategorySlug = post.category?.slug ?? "uncategorized";
+
+  if (expectedCategorySlug !== categorySlug) {
+    return null;
+  }
+
+  return post;
+}
+
+export async function publishPostById(id: number): Promise<PostItem> {
   const current = await prisma.post.findUnique({
     where: { id },
     include: postInclude,
@@ -139,11 +325,92 @@ export async function publishPostById(id: string): Promise<PostItem> {
     throw new Error(`Post not found: ${id}`);
   }
 
-  const post = await prisma.post.update({
+  const draftSnapshot = parsePublishedSnapshot(current.draftSnapshot);
+  const publishedAt = current.publishedAt ?? new Date();
+  const resolvedPublishedAt = draftSnapshot?.publishedAt ? new Date(draftSnapshot.publishedAt) : publishedAt;
+  const updateData = draftSnapshot
+    ? {
+        title: draftSnapshot.title,
+        slug: draftSnapshot.slug,
+        summary: draftSnapshot.summary,
+        content: draftSnapshot.content ?? Prisma.DbNull,
+        contentHtml: draftSnapshot.contentHtml,
+        authorName: draftSnapshot.authorName,
+        publishedAt: resolvedPublishedAt,
+        category: draftSnapshot.category
+          ? {
+              connect: { id: draftSnapshot.category.id },
+            }
+          : {
+              disconnect: true,
+            },
+        coverAsset: draftSnapshot.coverAsset
+          ? {
+              connect: { id: draftSnapshot.coverAsset.id },
+            }
+          : {
+              disconnect: true,
+            },
+        tags: {
+          deleteMany: {},
+          ...(draftSnapshot.tags.length > 0
+            ? {
+                create: draftSnapshot.tags.map((tag) => ({
+                  tag: {
+                    connect: { id: tag.id },
+                  },
+                })),
+              }
+            : {}),
+        },
+      }
+    : {
+        title: current.title,
+        slug: current.slug,
+        summary: current.summary,
+        content: current.content ?? Prisma.DbNull,
+        contentHtml: current.contentHtml,
+        authorName: current.authorName,
+        publishedAt,
+        category: current.category
+          ? {
+              connect: { id: current.category.id },
+            }
+          : {
+              disconnect: true,
+            },
+        coverAsset: current.coverAsset
+          ? {
+              connect: { id: current.coverAsset.id },
+            }
+          : {
+              disconnect: true,
+            },
+        tags: {
+          deleteMany: {},
+          create: current.tags.map(({ tag }) => ({
+            tag: {
+              connect: { id: tag.id },
+            },
+          })),
+        },
+      };
+  const publishedPost = await prisma.post.update({
     where: { id },
     data: {
       status: ContentStatus.PUBLISHED,
-      publishedAt: current.publishedAt ?? new Date(),
+      ...updateData,
+      publishedAt: resolvedPublishedAt,
+      draftSnapshot: Prisma.DbNull,
+    },
+    include: postInclude,
+  });
+
+  const snapshot = buildPublishedSnapshot(publishedPost, resolvedPublishedAt);
+  const post = await prisma.post.update({
+    where: { id },
+    data: {
+      publishedSnapshot: snapshot,
     },
     include: postInclude,
   });
@@ -151,7 +418,78 @@ export async function publishPostById(id: string): Promise<PostItem> {
   return mapPostRecord(post);
 }
 
-export async function unpublishPostById(id: string): Promise<PostItem> {
+export async function discardPostRevisionById(id: number): Promise<PostItem> {
+  const current = await prisma.post.findUnique({
+    where: { id },
+    include: postInclude,
+  });
+
+  if (!current) {
+    throw new Error(`Post not found: ${id}`);
+  }
+
+  const snapshot = parsePublishedSnapshot(current.publishedSnapshot);
+
+  if (!snapshot) {
+    throw new Error("这篇文章没有可以删除的草稿。");
+  }
+
+  const tagIds = snapshot.tags.map((tag) => tag.id);
+  const post = await prisma.post.update({
+    where: { id },
+    data: {
+      title: snapshot.title,
+      slug: snapshot.slug,
+      summary: snapshot.summary,
+      content: snapshot.content ?? Prisma.DbNull,
+      contentHtml: snapshot.contentHtml,
+      authorName: snapshot.authorName,
+      publishedAt: snapshot.publishedAt ? new Date(snapshot.publishedAt) : null,
+      status: ContentStatus.PUBLISHED,
+      category: snapshot.category
+        ? {
+            connect: { id: snapshot.category.id },
+          }
+        : {
+            disconnect: true,
+          },
+      coverAsset: snapshot.coverAsset
+        ? {
+            connect: { id: snapshot.coverAsset.id },
+          }
+        : {
+            disconnect: true,
+          },
+      tags: {
+        deleteMany: {},
+        ...(tagIds.length > 0
+          ? {
+              create: tagIds.map((tagId) => ({
+                tag: {
+                  connect: { id: tagId },
+                },
+              })),
+            }
+          : {}),
+      },
+      draftSnapshot: Prisma.DbNull,
+    },
+    include: postInclude,
+  });
+
+  return mapPostRecord(post);
+}
+
+export async function deletePostById(id: number): Promise<PostItem> {
+  const post = await prisma.post.delete({
+    where: { id },
+    include: postInclude,
+  });
+
+  return mapPostRecord(post);
+}
+
+export async function unpublishPostById(id: number): Promise<PostItem> {
   const post = await prisma.post.update({
     where: { id },
     data: {
@@ -165,70 +503,18 @@ export async function unpublishPostById(id: string): Promise<PostItem> {
 }
 
 export async function getPublishedPostSlugs(): Promise<string[]> {
-  const posts = await prisma.post.findMany({
-    where: {
-      status: ContentStatus.PUBLISHED,
-    },
-    select: {
-      slug: true,
-    },
-    orderBy: getPostOrderBy("latest"),
-  });
+  const posts = await listAllPublishedPosts();
 
   return posts.map((post) => post.slug);
 }
 
-function buildPublishedPostWhere(options: ListPublishedPostsOptions): Prisma.PostWhereInput {
-  const tagSlugs = Array.from(new Set((options.tagSlugs ?? []).filter(Boolean)));
-  const query = options.query?.trim();
+export async function getPublishedPostRouteParams(): Promise<Array<{ category: string; slug: string }>> {
+  const posts = await listAllPublishedPosts();
 
-  return {
-    status: ContentStatus.PUBLISHED,
-    ...(options.categorySlug
-      ? {
-          category: {
-            slug: options.categorySlug,
-          },
-        }
-      : {}),
-    ...(query
-      ? {
-          OR: [
-            {
-              title: {
-                contains: query,
-                mode: "insensitive",
-              },
-            },
-            {
-              summary: {
-                contains: query,
-                mode: "insensitive",
-              },
-            },
-            {
-              contentHtml: {
-                contains: query,
-                mode: "insensitive",
-              },
-            },
-          ],
-        }
-      : {}),
-    ...(tagSlugs.length > 0
-      ? {
-          AND: tagSlugs.map((slug) => ({
-            tags: {
-              some: {
-                tag: {
-                  slug,
-                },
-              },
-            },
-          })),
-        }
-      : {}),
-  };
+  return posts.map((post) => ({
+    category: post.category?.slug ?? "uncategorized",
+    slug: post.slug,
+  }));
 }
 
 function getPostOrderBy(sort: PostListSort = "latest"): Prisma.PostOrderByWithRelationInput[] {
@@ -241,6 +527,65 @@ function getPostOrderBy(sort: PostListSort = "latest"): Prisma.PostOrderByWithRe
   }
 
   return [{ publishedAt: Prisma.SortOrder.desc }, { createdAt: Prisma.SortOrder.desc }];
+}
+
+function filterPublishedPosts(
+  items: PostItem[],
+  options: Omit<ListPublishedPostsOptions, "page" | "pageSize">,
+) {
+  const tagSlugs = Array.from(new Set((options.tagSlugs ?? []).filter(Boolean)));
+  const query = options.query?.trim().toLowerCase();
+
+  return items.filter((item) => {
+    if (options.categorySlug && item.category?.slug !== options.categorySlug) {
+      return false;
+    }
+
+    if (
+      tagSlugs.length > 0 &&
+      !tagSlugs.every((slug) => item.tags.some((tag) => tag.slug === slug))
+    ) {
+      return false;
+    }
+
+    if (query) {
+      const haystack = [
+        item.title,
+        item.summary ?? "",
+        item.contentHtml ?? "",
+        item.authorName ?? "",
+        item.category?.name ?? "",
+        ...item.tags.map((tag) => tag.name),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      if (!haystack.includes(query)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+function sortPublishedPosts(items: PostItem[], sort: PostListSort = "latest") {
+  const nextItems = [...items];
+
+  if (sort === "earliest") {
+    nextItems.sort((left, right) => comparePostDates(left.publishedAt, right.publishedAt));
+    return nextItems;
+  }
+
+  if (sort === "updated") {
+    nextItems.sort((left, right) =>
+      comparePostDates(right.updatedAt ?? right.publishedAt, left.updatedAt ?? left.publishedAt),
+    );
+    return nextItems;
+  }
+
+  nextItems.sort((left, right) => comparePostDates(right.publishedAt, left.publishedAt));
+  return nextItems;
 }
 
 function mapPostRecord(record: PostRecord): PostItem {
@@ -256,6 +601,8 @@ function mapPostRecord(record: PostRecord): PostItem {
     publishedAt: toIsoString(record.publishedAt),
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
+    publishedSnapshot: parsePublishedSnapshot(record.publishedSnapshot),
+    draftSnapshot: parseDraftSnapshot(record.draftSnapshot),
     category: record.category
       ? {
           id: record.category.id,
@@ -281,6 +628,150 @@ function mapPostRecord(record: PostRecord): PostItem {
   };
 }
 
+function mapPublishedPostRecord(record: PostRecord): PostItem {
+  const snapshot = parsePublishedSnapshot(record.publishedSnapshot);
+
+  if (!snapshot) {
+    return mapPostRecord(record);
+  }
+
+  return {
+    id: record.id,
+    title: snapshot.title,
+    slug: snapshot.slug,
+    summary: snapshot.summary,
+    status: record.status,
+    content: snapshot.content,
+    contentHtml: snapshot.contentHtml,
+    authorName: snapshot.authorName,
+    publishedAt: snapshot.publishedAt,
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
+    publishedSnapshot: snapshot,
+    draftSnapshot: parseDraftSnapshot(record.draftSnapshot),
+    category: snapshot.category,
+    coverAsset: snapshot.coverAsset,
+    tags: snapshot.tags,
+  };
+}
+
+function buildPublishedSnapshot(record: PostRecord, publishedAt: Date): PublishedPostSnapshot {
+  return {
+    title: record.title,
+    slug: record.slug,
+    summary: record.summary,
+    content: record.content,
+    contentHtml: record.contentHtml,
+    authorName: record.authorName,
+    publishedAt: publishedAt.toISOString(),
+    category: record.category
+      ? {
+          id: record.category.id,
+          name: record.category.name,
+          slug: record.category.slug,
+        }
+      : null,
+    coverAsset: record.coverAsset
+      ? {
+          id: record.coverAsset.id,
+          url: record.coverAsset.url,
+          alt: record.coverAsset.alt,
+          mimeType: record.coverAsset.mimeType,
+          width: record.coverAsset.width,
+          height: record.coverAsset.height,
+        }
+      : null,
+    tags: record.tags.map(({ tag }) => ({
+      id: tag.id,
+      name: tag.name,
+      slug: tag.slug,
+    })),
+  };
+}
+
+function buildDraftSnapshot(input: {
+  title: string;
+  slug: string;
+  summary: string | null;
+  content: Prisma.JsonValue | null;
+  contentHtml: string | null;
+  authorName: string | null;
+  publishedAt: Date | null;
+  category: { id: number; name: string; slug: string } | null;
+  coverAsset: AssetSummary | null;
+  tags: Array<{ id: string; name: string; slug: string }>;
+}): DraftPostSnapshot {
+  const savedAt = new Date().toISOString();
+
+  return {
+    title: input.title,
+    slug: input.slug,
+    summary: input.summary,
+    content: input.content,
+    contentHtml: input.contentHtml,
+    authorName: input.authorName,
+    publishedAt: toIsoString(input.publishedAt),
+    savedAt,
+    category: input.category,
+    coverAsset: input.coverAsset,
+    tags: input.tags,
+  };
+}
+
+function parsePublishedSnapshot(value: Prisma.JsonValue | null): PublishedPostSnapshot | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as PublishedPostSnapshot;
+}
+
+function parseDraftSnapshot(value: Prisma.JsonValue | null): DraftPostSnapshot | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const snapshot = value as Partial<PublishedPostSnapshot> & {
+    savedAt?: unknown;
+    updatedAt?: unknown;
+    createdAt?: unknown;
+  };
+
+  const savedAt =
+    typeof snapshot.savedAt === "string"
+      ? snapshot.savedAt
+      : typeof snapshot.updatedAt === "string"
+        ? snapshot.updatedAt
+        : typeof snapshot.createdAt === "string"
+          ? snapshot.createdAt
+          : null;
+
+  if (!savedAt) {
+    return null;
+  }
+
+  return {
+    title: snapshot.title ?? "",
+    slug: snapshot.slug ?? "",
+    summary: snapshot.summary ?? null,
+    content: snapshot.content ?? null,
+    contentHtml: snapshot.contentHtml ?? null,
+    authorName: snapshot.authorName ?? null,
+    publishedAt: snapshot.publishedAt ?? null,
+    savedAt,
+    category: snapshot.category ?? null,
+    coverAsset: snapshot.coverAsset ?? null,
+    tags: Array.isArray(snapshot.tags) ? snapshot.tags : [],
+  };
+}
+
+function comparePostDates(left?: string | null, right?: string | null) {
+  const leftTime = left ? new Date(left).getTime() : 0;
+  const rightTime = right ? new Date(right).getTime() : 0;
+
+  return leftTime - rightTime;
+}
+
 function getSafePage(value?: number) {
   if (!value || value < 1) {
     return 1;
@@ -299,4 +790,8 @@ function getSafePageSize(value?: number) {
 
 function toIsoString(value: Date | null) {
   return value ? value.toISOString() : null;
+}
+
+function createTemporarySlug() {
+  return `draft-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }

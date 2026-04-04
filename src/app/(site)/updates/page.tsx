@@ -24,7 +24,11 @@ export default async function UpdatesPage({ searchParams }: UpdatesPageProps) {
   const allUpdates = await listAllPublishedUpdates();
 
   const filteredUpdates = allUpdates.filter((update) => {
-    if (category && update.category?.slug !== category) {
+    if (category === "uncategorized") {
+      if (update.category) {
+        return false;
+      }
+    } else if (category && update.category?.slug !== category) {
       return false;
     }
 
@@ -411,6 +415,10 @@ function getVisiblePageItems(currentPage: number, totalPages: number) {
 }
 
 function getCategoryFilterLabel(slug: string, updates: PublishedUpdate[]) {
+  if (slug === "uncategorized") {
+    return "未分类";
+  }
+
   return (
     updates.find((update) => update.category?.slug === slug)?.category?.name ?? formatContentTerm(slug)
   );

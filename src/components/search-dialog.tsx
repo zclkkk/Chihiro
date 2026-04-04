@@ -7,7 +7,7 @@ import { Search, X } from "lucide-react";
 import { RelativeDate } from "@/components/relative-date";
 
 export type SearchDialogItem = {
-  id: string;
+  id: string | number;
   href: string;
   title: string;
   publishedAt: string | null;
@@ -125,7 +125,7 @@ export function SearchDialog({
                         <div className="grid gap-1">
                           {results.map(({ item }) => (
                             <Link
-                              key={item.id}
+                              key={item.href}
                               href={item.href}
                               onClick={() => setIsOpen(false)}
                               className="rounded-[1.1rem] px-3 py-3 transition hover:bg-zinc-50 dark:hover:bg-zinc-900"

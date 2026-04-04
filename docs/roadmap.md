@@ -8,16 +8,31 @@
 
 - 公开站点已经有首页、文章列表、文章详情、动态列表、动态详情、归档页基础
 - `posts` 页已经具备 query 驱动的分页、排序、分类和标签筛选
-- `updates` 页已经开始对齐 `posts` 的分页与筛选逻辑
-- 第一版 `prisma/schema.prisma` 已经起草完成
-- `.env.example` 已经补上 `DATABASE_URL` 约定
-- `Prisma` 依赖已经安装完成
-- `prisma.config.ts` 已经按 Prisma 7 方式接入
-- Prisma Client 已经生成成功
-- `src/server/db/client.ts` 和 `posts / updates / assets` repository 骨架已经建立
-- Prisma schema 已经成功推送到远程数据库
+- `updates` 页已经基本对齐 `posts` 的分页与筛选逻辑
+- 第一版 `prisma/schema.prisma` 已经落地，数据库已完成 `db push`
+- `Prisma`、`prisma.config.ts`、Prisma Client、`src/server/db/client.ts` 已经接入
+- `posts / updates / assets / site / admin-auth` repository 已经建立并开始承担真实数据访问
 - 当前站点的文章、动态、标签、分类、站点配置、资源占位数据已经 seed 到数据库
-- admin 路由已经存在，但仍然是占位状态
+- 公开页已经切到 repository：
+  - 首页读取站点配置
+  - `/posts`、`/posts/[slug]`
+  - `/updates`、`/updates/[slug]`
+  - `/archives`
+  - `rss.xml`
+  - `sitemap.xml`
+- 后台登录、session cookie 鉴权、`/admin` 路由保护和登出流程已经接入
+- 后台编辑台已经合并成 `/admin/workbench`，上方是撰写入口，下方是文章 / 动态 / 分类 / 标签管理区
+- 后台文章管理已经支持：
+  - 编辑文章
+  - 保存草稿
+  - 发布文章 / 更新并发布
+  - 删除文章
+  - 删除已保存修订
+- 已发布文章再次编辑时，会优先回填 `draftSnapshot`，而不是原始发布版本
+- 草稿现在会单独记录 `draftSnapshot.savedAt`，编辑页底部会提示当前正在编辑的是哪一次保存的草稿
+- `保存草稿` 会保留在当前编辑页，不会跳回编辑台
+- `发布文章` / `更新并发布` 成功后会跳回编辑台
+- 发布后的 `revalidatePath` 已经接入首页、列表页、详情页、归档、RSS、sitemap 刷新
 - 架构方向已经确认：
   - 单租户、单站点 CMS
   - `Postgres + Prisma + S3/R2`
@@ -27,96 +42,88 @@
 
 当前最重要的变化是：
 
-项目的“页面方向”已经比较清楚了，但“内容系统地基”还没有正式落地。
+项目已经不再停留在“页面方向”和“数据骨架”阶段，公开展示链路、后台编辑闭环、草稿修订链路与基础发布链路都已经跑通了。
+
+现在真正缺的是：
+
+- 稳定的 `content -> contentHtml` 渲染链路
+- 上传与资源引用能力
 
 ## 当前还没做的关键部分
 
-下面这些是现在最重要、但还没有真正开始的部分：
+下面这些是现在最重要、但还没有真正完成的部分：
 
-- 对象存储上传
+- `content -> contentHtml` 的正式渲染链路
+- 对象存储上传与 `Asset` 引用
 - 富文本编辑器
-- `content -> contentHtml` 渲染链路
-- 发布后的 revalidate 实现
-- 正式后台发布流程
 
 ## 接下来推荐顺序
 
-### 1. 建数据库 schema
+### 1. 先完成后台内容创建与编辑闭环
 
-这一部分已经开始，当前已完成：
+这部分已经基本完成了，当前重点不再是“能不能写”，而是把写作体验再磨顺。
 
-- 建立 `prisma/schema.prisma`
-- 定义 `Post`
-- 定义 `Update`
-- 定义 `Asset`
-- 补充 `Tag`、`Category`、`SiteSettings`
-- 建立 `.env.example`
+目前后台已经有：
 
-接下来需要做的是：
+- 登录保护
+- 内容概览
+- 编辑台
+- 草稿修订回填
+- 发布 / 转回草稿
 
-- 跑第一版迁移或 `db push`
+当前编辑页已经支持：
 
-第一版不要追求一次把所有模型建满，先把主干模型跑通。
+- 创建文章
+- 编辑已有内容
+- 保存草稿
+- 发布文章
+- 保存已发布文章的修订稿
+- 删除修订后恢复到上一次已发布版本
 
-建议第一版优先包含这些字段：
+这一阶段的重点已经从“把功能做出来”转成“把工作流做顺”。
 
-- `id`
-- `title`
-- `slug`
-- `summary`
-- `status`
-- `content`
-- `contentHtml`
-- `publishedAt`
-- `updatedAt`
-- `createdAt`
+### 2. 补 `content -> contentHtml` 的最小可用渲染链路
 
-### 2. 接 Prisma 与数据库访问层
+当前公开详情页已经支持优先读取 `contentHtml`，没有时再回退到 `content` 的文本段落。
 
-这一部分也已经开始，当前已完成：
+所以下一步需要把内容保存链路和渲染链路统一起来，至少明确：
 
-- `src/server/db/client.ts`
-- `src/server/repositories/posts.ts`
-- `src/server/repositories/updates.ts`
-- `src/server/repositories/assets.ts`
+- 后台保存时如何生成 `contentHtml`
+- 公开页渲染时优先读什么
+- 草稿预览是否复用同一套转换
 
-当前目标已经从“建立接口骨架”变成“把公开页面切到 repository”。
+第一版可以很克制，不需要一步到位：
 
-### 3. 把公开页面切到 repository
+- 如果先用 `textarea`，可以先接一版 markdown -> html
+- 如果先用结构化 JSON，也可以先做最小节点集转换
 
-这一步现在已经成为最优先的下一步，只换数据来源，不大改页面表现：
+重点是先建立稳定的单一来源，而不是先追求编辑器能力。
 
-- 首页改成读 repository
-- `/posts` 改成读 repository
-- `/posts/[slug]` 改成读 repository
-- `/updates` 改成读 repository
-- `/updates/[slug]` 改成读 repository
-- `/archives` 改成读 repository
+### 3. 再补编辑动作与发布流整合
 
-这样做完后，公开页就会从“本地演示数据”进入“真实内容系统雏形”。
+创建 / 编辑能力落地之后，继续把发布流补完整：
 
-### 4. 补发布与缓存刷新
+- 保存草稿后留在当前编辑页
+- 发布成功后回到编辑台
+- 已发布文章编辑时继续回填修订稿
+- 发布前校验必填字段
+- 发布后继续复用现有 `revalidatePath`
+- 必要时补“预览”或“最近修改内容”
 
-公开页面改成读数据库之后，再补：
+这一阶段做完，后台才算从“管理已有数据”变成“真正的内容工作台”。
 
-- 发布动作
-- 草稿状态
-- `revalidatePath` / `revalidateTag`
-- 首页、列表页、详情页、归档页刷新
+### 4. 接对象存储上传
 
-这一步会把 ISR 真正接入内容发布流。
-
-### 5. 接对象存储上传
-
-然后做资源能力：
+然后再做资源能力：
 
 - 接对象存储上传
 - 建 `Asset` 元数据记录
-- 让内容可以引用图片与视频
+- 让文章和动态内容可以引用图片
+- 本地文件仅作为开发环境 fallback
 
-本地文件如果要支持，也只建议作为开发环境 fallback。
+如果在编辑闭环之前先做上传，后面通常还会回头改资源插入方式，所以推荐放在编辑链路之后。
 
-### 6. 最后再做编辑器
+### 5. 最后再接富文本编辑器
 
 编辑器建议放在上面这些地基之后。
 
@@ -133,7 +140,7 @@
 
 先让普通文章可写、可存、可发布、可展示。
 
-### 7. 第二阶段再做高级内容块
+### 6. 第二阶段再做高级内容块
 
 下面这些不要现在就做：
 
@@ -150,6 +157,6 @@
 
 下一步最应该开始做的是：
 
-**`Prisma schema -> repository -> 公开页切库 -> 发布与 revalidate -> 上传 -> 编辑器`**
+**`后台创建 / 编辑 -> content 渲染链路 -> 编辑动作补全 -> 上传 -> 编辑器`**
 
-这条路径是当前最稳、最不容易返工的路线。
+这条路径更符合当前真实进度，也最不容易返工。

@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDeferredValue, useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -12,11 +13,16 @@ import {
   Compass,
   FileArchive,
   GalleryVerticalEnd,
+  LayoutDashboard,
+  LogIn,
+  LogOut,
   Menu,
   Sparkles,
-  UserRound,
   X,
 } from "lucide-react";
+import { AdminLoginDialog } from "@/components/admin-login-dialog";
+import { logoutAction } from "@/app/(admin)/admin/login/actions";
+import { HeaderNav } from "@/components/header-nav";
 import { RelativeDate } from "@/components/relative-date";
 import { ThemeModeToggle } from "@/components/theme-mode-toggle";
 import { siteConfig } from "@/lib/site";
@@ -59,9 +65,10 @@ export type SiteHeaderPostCategory = {
   label: string;
   href: string;
   posts: Array<{
-    id: string;
+    id: string | number;
     slug: string;
     title: string;
+    href: string;
   }>;
 };
 
@@ -73,7 +80,7 @@ export type SiteHeaderUpdateCategory = {
 };
 
 export type SiteHeaderRecentArchiveItem = {
-  id: string;
+  id: string | number;
   href: string;
   title: string;
   categoryLabel: string;
@@ -89,30 +96,41 @@ const morePlaceholders = [
 ];
 
 type SiteHeaderProps = {
+  adminHasUsers: boolean;
+  isAdminLoggedIn: boolean;
+  adminDisplayName: string;
+  adminAvatarUrl?: string | null;
   postCategories: SiteHeaderPostCategory[];
   updateCategories: SiteHeaderUpdateCategory[];
   recentArchiveItems: SiteHeaderRecentArchiveItem[];
+  recentUpdateItems: SiteHeaderRecentArchiveItem[];
 };
 
 export function SiteHeader({
+  adminHasUsers,
+  isAdminLoggedIn,
+  adminDisplayName,
+  adminAvatarUrl,
   postCategories,
   updateCategories,
   recentArchiveItems,
+  recentUpdateItems,
 }: SiteHeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileBrandVisible, setIsMobileBrandVisible] = useState(true);
   const [isMegaNavOpen, setIsMegaNavOpen] = useState(false);
   const [highlightedHref, setHighlightedHref] = useState<string | null>(null);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [expandedMobileHref, setExpandedMobileHref] = useState<string | null>(null);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [hoveredPostCategorySlug, setHoveredPostCategorySlug] = useState<string | null>(
     postCategories[0]?.slug ?? null,
   );
-  const [hoveredUpdateCategoryTag, setHoveredUpdateCategoryTag] = useState<string | null>(
-    updateCategories[0]?.tag ?? null,
-  );
   const megaNavRef = useRef<HTMLDivElement | null>(null);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
   const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const mobileMenuPanelRef = useRef<HTMLDivElement | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -188,6 +206,28 @@ export function SiteHeader({
     };
   }, [isMobileNavOpen]);
 
+  useEffect(() => {
+    if (!isUserMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+
+      if (userMenuRef.current?.contains(target)) {
+        return;
+      }
+
+      setIsUserMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [isUserMenuOpen]);
+
   const openMegaNav = (href: string) => {
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
@@ -196,10 +236,6 @@ export function SiteHeader({
 
     if (href === "/posts" && postCategories.length > 0) {
       setHoveredPostCategorySlug(postCategories[0].slug);
-    }
-
-    if (href === "/updates" && updateCategories.length > 0) {
-      setHoveredUpdateCategoryTag(updateCategories[0].tag);
     }
 
     setIsMegaNavOpen(true);
@@ -227,6 +263,25 @@ export function SiteHeader({
     navItems.find((item) => isActivePath(pathname, item.href)) ?? navItems[0];
   const featuredItem =
     navItems.find((item) => item.href === highlightedHref) ?? activeItem;
+  const isAdminLoginOpen = searchParams.get("admin-login") === "1";
+  const adminLoginNext = getSafeAdminPath(searchParams.get("next")) ?? "/admin";
+
+  const openAdminLogin = (next = "/admin") => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("admin-login", "1");
+    params.set("next", getSafeAdminPath(next) ?? "/admin");
+    setIsMobileNavOpen(false);
+    setExpandedMobileHref(null);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const closeAdminLogin = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("admin-login");
+    params.delete("next");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   return (
     <header className="pointer-events-none fixed inset-x-0 top-0 z-50 px-3 py-3 sm:px-6">
@@ -286,62 +341,17 @@ export function SiteHeader({
             }
           }}
         >
-          <nav
-            className={`items-center justify-center overflow-hidden rounded-full text-sm font-medium text-zinc-600 transition-all duration-300 dark:text-zinc-300 md:flex ${
-              isScrolled
-                ? "bg-white/80 shadow-sm dark:border dark:border-zinc-800/70 dark:bg-zinc-950/58 dark:backdrop-blur-xl dark:shadow-[0_18px_45px_rgba(0,0,0,0.34)]"
-                : "bg-transparent"
-            }`}
-          >
-            {navItems.map((item) => {
-              const active = isActivePath(pathname, item.href);
-              const Icon = item.icon;
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onMouseEnter={() => openMegaNav(item.href)}
-                  onFocus={() => openMegaNav(item.href)}
-                  className={`relative flex items-center gap-2 overflow-hidden rounded-none px-4 py-2 transition-colors first:rounded-l-full last:rounded-r-full ${
-                    active
-                      ? "font-semibold text-primary"
-                      : "text-zinc-600 hover:text-primary dark:text-zinc-300"
-                  }`}
-                >
-                  {active && deferredIsScrolled ? (
-                    <motion.span
-                      layoutId="nav-indicator"
-                      className="absolute inset-0 rounded-full border border-primary/25 bg-primary/10 shadow-sm dark:border-sky-300/15 dark:bg-sky-400/10 dark:shadow-[0_0_0_1px_rgba(125,211,252,0.05),0_12px_28px_rgba(2,6,23,0.42)]"
-                      transition={{ type: "spring", stiffness: 500, damping: 32 }}
-                    />
-                  ) : null}
-
-                  <span className="relative z-10 flex items-center justify-center">
-                    <AnimatePresence initial={false}>
-                      {active ? (
-                        <motion.span
-                          initial={{ width: 0, opacity: 0, scale: 0, marginRight: 0 }}
-                          animate={{
-                            width: "auto",
-                            opacity: 1,
-                            scale: 1,
-                            marginRight: 8,
-                          }}
-                          exit={{ width: 0, opacity: 0, scale: 0, marginRight: 0 }}
-                          transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                          className="flex items-center justify-center overflow-hidden"
-                        >
-                          <Icon className="h-4 w-4" />
-                        </motion.span>
-                      ) : null}
-                    </AnimatePresence>
-                    <span className="whitespace-nowrap">{item.label}</span>
-                  </span>
-                </Link>
-              );
-            })}
-          </nav>
+          <HeaderNav
+            pathname={pathname}
+            isScrolled={isScrolled}
+            deferredIsScrolled={deferredIsScrolled}
+            items={navItems}
+            layoutId="nav-indicator"
+            className="md:flex"
+            onItemEnter={openMegaNav}
+            onItemFocus={openMegaNav}
+            isActivePath={isActivePath}
+          />
 
           <AnimatePresence>
             {isMegaNavOpen ? (
@@ -359,10 +369,9 @@ export function SiteHeader({
                       postCategories,
                       updateCategories,
                       recentArchiveItems,
+                      recentUpdateItems,
                       hoveredPostCategorySlug,
                       onHoverPostCategory: setHoveredPostCategorySlug,
-                      hoveredUpdateCategoryTag,
-                      onHoverUpdateCategory: setHoveredUpdateCategoryTag,
                       onNavigate: handleMegaNavNavigate,
                     })}
                   </div>
@@ -376,19 +385,91 @@ export function SiteHeader({
           <div className="hidden md:block">
             <ThemeModeToggle isScrolled={isScrolled} />
           </div>
-          <Link
-            href="/admin"
-            aria-label="Sign in"
-            className={`inline-flex items-center justify-center rounded-2xl px-3 py-1.5 text-zinc-800 transition ${
-              isScrolled
-                ? "border border-zinc-200/80 bg-white/80 shadow-sm hover:border-primary/30 hover:text-primary dark:border-zinc-800/70 dark:bg-zinc-950/65 dark:text-zinc-200 dark:backdrop-blur-xl dark:shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
-                : "border border-transparent bg-transparent hover:text-primary dark:text-zinc-200"
-            }`}
-          >
-            <UserRound className="h-4.5 w-4.5" />
-          </Link>
+          {isAdminLoggedIn ? (
+            <div
+              ref={userMenuRef}
+              className="relative"
+              onMouseEnter={() => setIsUserMenuOpen(true)}
+              onMouseLeave={() => setIsUserMenuOpen(false)}
+            >
+              <button
+                type="button"
+                aria-label={`${adminDisplayName} menu`}
+                aria-expanded={isUserMenuOpen}
+                onClick={() => setIsUserMenuOpen((current) => !current)}
+                onFocus={() => setIsUserMenuOpen(true)}
+                className={`inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-zinc-800 transition ${
+                  isScrolled
+                    ? "border border-zinc-200/80 bg-white/80 shadow-sm hover:border-primary/30 dark:border-zinc-800/70 dark:bg-zinc-950/65 dark:text-zinc-200 dark:backdrop-blur-xl dark:shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
+                    : "border border-transparent bg-transparent dark:text-zinc-200"
+                }`}
+              >
+                <HeaderUserAvatar author={adminDisplayName} src={adminAvatarUrl} />
+              </button>
+
+              <AnimatePresence>
+                {isUserMenuOpen ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="absolute right-0 top-full z-50 w-36 pt-2.5 sm:left-1/2 sm:right-auto sm:-translate-x-1/2"
+                  >
+                    <div
+                      aria-hidden="true"
+                      className="absolute right-0 top-0 h-2.5 w-36 sm:left-1/2 sm:right-auto sm:-translate-x-1/2"
+                    />
+                    <div className="rounded-[1.2rem] border border-zinc-200/80 bg-white/92 p-2 shadow-[0_18px_50px_rgba(24,24,27,0.14)] backdrop-blur-xl dark:border-zinc-800/70 dark:bg-[rgba(10,10,14,0.84)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.44)]">
+                      <Link
+                        href="/admin"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="flex items-center gap-3 rounded-[0.95rem] px-3 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50"
+                      >
+                        <LayoutDashboard className="h-4 w-4 shrink-0" />
+                        <span>控制面板</span>
+                      </Link>
+                      <form action={logoutAction}>
+                        <button
+                          type="submit"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex w-full items-center gap-3 rounded-[0.95rem] px-3 py-2.5 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50"
+                        >
+                          <LogOut className="h-4 w-4 shrink-0" />
+                          <span>退出登录</span>
+                        </button>
+                      </form>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <Link
+              href={adminLoginNext}
+              aria-label="Open admin login"
+              onClick={(event) => {
+                event.preventDefault();
+                openAdminLogin(adminLoginNext);
+              }}
+              className={`inline-flex items-center justify-center rounded-2xl px-3 py-1.5 text-zinc-800 transition ${
+                isScrolled
+                  ? "border border-zinc-200/80 bg-white/80 shadow-sm hover:border-primary/30 hover:text-primary dark:border-zinc-800/70 dark:bg-zinc-950/65 dark:text-zinc-200 dark:backdrop-blur-xl dark:shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
+                  : "border border-transparent bg-transparent hover:text-primary dark:text-zinc-200"
+              }`}
+            >
+              <LogIn className="h-4.5 w-4.5" />
+            </Link>
+          )}
         </div>
       </div>
+
+      <AdminLoginDialog
+        adminHasUsers={adminHasUsers}
+        isOpen={isAdminLoginOpen}
+        next={adminLoginNext}
+        onClose={closeAdminLogin}
+      />
 
       <AnimatePresence>
         {isMobileNavOpen ? (
@@ -496,6 +577,32 @@ export function SiteHeader({
   );
 }
 
+function HeaderUserAvatar({ author, src }: { author: string; src?: string | null }) {
+  const initial = author.trim().charAt(0).toUpperCase() || "?";
+
+  if (!src) {
+    return (
+      <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-200 via-zinc-100 to-white text-sm font-semibold text-zinc-500 dark:from-zinc-800 dark:via-zinc-900 dark:to-zinc-950 dark:text-zinc-300">
+        <span aria-hidden="true">{initial}</span>
+        <span className="sr-only">{author} avatar placeholder</span>
+      </span>
+    );
+  }
+
+  return (
+    <>
+      <Image
+        src={src}
+        alt={`${author} avatar`}
+        width={40}
+        height={40}
+        className="h-full w-full object-cover"
+      />
+      <span className="sr-only">{author}</span>
+    </>
+  );
+}
+
 function isActivePath(pathname: string, href: string) {
   if (href === "/") {
     return pathname === "/";
@@ -504,16 +611,23 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function getSafeAdminPath(value: string | null) {
+  if (!value || !value.startsWith("/admin")) {
+    return null;
+  }
+
+  return value;
+}
+
 function renderMegaNavContent(
   href: string,
   options: {
     postCategories: SiteHeaderPostCategory[];
     updateCategories: SiteHeaderUpdateCategory[];
     recentArchiveItems: SiteHeaderRecentArchiveItem[];
+    recentUpdateItems: SiteHeaderRecentArchiveItem[];
     hoveredPostCategorySlug: string | null;
     onHoverPostCategory: (slug: string) => void;
-    hoveredUpdateCategoryTag: string | null;
-    onHoverUpdateCategory: (tag: string) => void;
     onNavigate: () => void;
   },
 ) {
@@ -549,8 +663,7 @@ function renderMegaNavContent(
         <MegaNavSection eyebrow="Categories">
           <UpdateMegaNavContent
             updateCategories={options.updateCategories}
-            hoveredUpdateCategoryTag={options.hoveredUpdateCategoryTag}
-            onHoverUpdateCategory={options.onHoverUpdateCategory}
+            recentUpdateItems={options.recentUpdateItems}
             onNavigate={options.onNavigate}
           />
         </MegaNavSection>
@@ -567,7 +680,7 @@ function renderMegaNavContent(
             <div className="grid gap-1">
               {options.recentArchiveItems.map((item) => (
                 <MegaNavRecentEntry
-                  key={item.id}
+                  key={`${item.kind}-${item.id}`}
                   href={item.href}
                   title={item.title}
                   categoryLabel={item.categoryLabel}
@@ -745,8 +858,8 @@ function PostMegaNavContent({
   }
 
   return (
-    <div className="grid gap-5 md:grid-cols-[10rem_minmax(0,1fr)]">
-      <div className="grid gap-1">
+    <motion.div layout className="grid items-start gap-5 md:grid-cols-[9rem_minmax(0,1fr)]">
+      <div className="grid items-start gap-1">
         {postCategories.map((category) => {
           const active = category.slug === activeCategory.slug;
 
@@ -758,14 +871,14 @@ function PostMegaNavContent({
               onMouseDown={(event) => event.preventDefault()}
               onMouseEnter={() => onHoverPostCategory(category.slug)}
               onFocus={() => onHoverPostCategory(category.slug)}
-              className={`flex items-center justify-between rounded-[0.9rem] px-2 py-2 text-left transition-colors ${
+              className={`flex items-center justify-between rounded-[0.8rem] px-2 py-1.5 text-left text-[0.78rem] transition-colors ${
                 active
                   ? "bg-zinc-50 text-zinc-950 dark:bg-zinc-900/80 dark:text-zinc-100"
                   : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-200"
               }`}
             >
-              <span className="text-sm font-medium">{category.label}</span>
-              <span className="text-[0.68rem] tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
+              <span className="font-medium">{category.label}</span>
+              <span className="text-[0.64rem] tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
                 {category.posts.length}
               </span>
             </Link>
@@ -773,7 +886,7 @@ function PostMegaNavContent({
         })}
       </div>
 
-      <div className="min-w-0 border-l border-zinc-200/70 pl-4 dark:border-zinc-800/80">
+      <motion.div layout className="min-w-0 self-start border-l border-zinc-200/70 pl-4 dark:border-zinc-800/80">
         <div className="mb-2 flex items-center justify-between gap-3">
           <p className="text-[0.68rem] uppercase tracking-[0.24em] text-zinc-400 dark:text-zinc-500">
             {activeCategory.label}
@@ -786,75 +899,71 @@ function PostMegaNavContent({
             View all
           </Link>
         </div>
-        <div className="grid gap-1">
-          {activeCategory.posts.map((post) => (
-            <MegaNavArticleLink
-              key={post.id}
-              href={`/posts/${post.slug}`}
-              title={post.title}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={activeCategory.slug}
+            layout
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.16, ease: "easeOut" }}
+            className="grid gap-1"
+          >
+            {activeCategory.posts.length > 0 ? (
+              activeCategory.posts.map((post) => (
+                <MegaNavArticleLink
+                  key={post.id}
+                  href={post.href}
+                  title={post.title}
+                  onNavigate={onNavigate}
+                />
+              ))
+            ) : (
+              <MegaNavEmptyState text="No posts in this category." />
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
   );
 }
 
 function UpdateMegaNavContent({
   updateCategories,
-  hoveredUpdateCategoryTag,
-  onHoverUpdateCategory,
+  recentUpdateItems,
   onNavigate,
 }: {
   updateCategories: SiteHeaderUpdateCategory[];
-  hoveredUpdateCategoryTag: string | null;
-  onHoverUpdateCategory: (tag: string) => void;
+  recentUpdateItems: SiteHeaderRecentArchiveItem[];
   onNavigate: () => void;
 }) {
-  const activeCategory =
-    updateCategories.find((category) => category.tag === hoveredUpdateCategoryTag) ??
-    updateCategories[0];
-
-  if (!activeCategory) {
-    return null;
-  }
-
   return (
-    <div className="grid gap-5 md:grid-cols-[10rem_minmax(0,1fr)]">
-      <div className="grid gap-1">
+    <motion.div layout className="grid items-start gap-5 md:grid-cols-[9rem_minmax(0,1fr)]">
+      <div className="grid items-start gap-1">
         {updateCategories.map((category) => {
-          const active = category.tag === activeCategory.tag;
-
           return (
-            <button
+            <Link
               key={category.tag}
-              type="button"
-              onMouseDown={(event) => event.preventDefault()}
-              onMouseEnter={() => onHoverUpdateCategory(category.tag)}
-              onFocus={() => onHoverUpdateCategory(category.tag)}
-              className={`flex items-center justify-between rounded-[0.9rem] px-2 py-2 text-left transition-colors ${
-                active
-                  ? "bg-zinc-50 text-zinc-950 dark:bg-zinc-900/80 dark:text-zinc-100"
-                  : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-200"
-              }`}
+              href={category.href}
+              onClick={onNavigate}
+              className="flex items-center justify-between rounded-[0.8rem] px-2 py-1.5 text-left text-[0.78rem] text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-200"
             >
-              <span className="text-sm font-medium">{category.label}</span>
-              <span className="text-[0.68rem] tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
+              <span className="font-medium">{category.label}</span>
+              <span className="text-[0.64rem] tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
                 {category.items.length}
               </span>
-            </button>
+            </Link>
           );
         })}
       </div>
 
-      <div className="min-w-0 border-l border-zinc-200/70 pl-4 dark:border-zinc-800/80">
+      <motion.div layout className="min-w-0 self-start border-l border-zinc-200/70 pl-4 dark:border-zinc-800/80">
         <div className="mb-2 flex items-center justify-between gap-3">
           <p className="text-[0.68rem] uppercase tracking-[0.24em] text-zinc-400 dark:text-zinc-500">
-            {activeCategory.label}
+            Latest
           </p>
           <Link
-            href={activeCategory.href}
+            href="/updates"
             onClick={onNavigate}
             className="text-xs font-medium text-zinc-500 transition hover:text-primary dark:text-zinc-400 dark:hover:text-sky-300"
           >
@@ -862,17 +971,23 @@ function UpdateMegaNavContent({
           </Link>
         </div>
         <div className="grid gap-1">
-          {activeCategory.items.map((item) => (
-            <MegaNavArticleLink
-              key={item}
-              href={activeCategory.href}
-              title={item}
-              onNavigate={onNavigate}
-            />
-          ))}
+          {recentUpdateItems.length > 0 ? (
+            recentUpdateItems.map((item) => (
+              <MegaNavRecentEntry
+                key={`${item.kind}-${item.id}`}
+                href={item.href}
+                title={item.title}
+                dateValue={item.publishedAt}
+                compact
+                onNavigate={onNavigate}
+              />
+            ))
+          ) : (
+            <MegaNavEmptyState text="No updates yet." />
+          )}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -914,19 +1029,29 @@ function MegaNavArticleLink({
   );
 }
 
+function MegaNavEmptyState({ text }: { text: string }) {
+  return (
+    <div className="px-1 py-1 text-sm text-zinc-400 dark:text-zinc-500">
+      {text}
+    </div>
+  );
+}
+
 function MegaNavRecentEntry({
   href,
   title,
   categoryLabel,
   kind,
   dateValue,
+  compact = false,
   onNavigate,
 }: {
   href: string;
   title: string;
-  categoryLabel: string;
-  kind: "文章" | "动态";
+  categoryLabel?: string;
+  kind?: "文章" | "动态";
   dateValue: string | null;
+  compact?: boolean;
   onNavigate: () => void;
 }) {
   return (
@@ -936,9 +1061,11 @@ function MegaNavRecentEntry({
       className="group rounded-[0.95rem] px-2 py-2 transition-colors duration-200 hover:bg-zinc-50/90 dark:hover:bg-zinc-900/70"
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[0.68rem] font-medium tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
-          {kind}
-        </span>
+        {!compact && kind ? (
+          <span className="text-[0.68rem] font-medium tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
+            {kind}
+          </span>
+        ) : null}
         <span className="text-xs text-zinc-400 dark:text-zinc-500">
           <RelativeDate value={dateValue} />
         </span>
@@ -946,7 +1073,9 @@ function MegaNavRecentEntry({
       <p className="mt-1 text-sm font-medium text-zinc-900 transition group-hover:text-primary dark:text-zinc-100 dark:group-hover:text-sky-300">
         {title}
       </p>
-      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{categoryLabel}</p>
+      {!compact && categoryLabel ? (
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{categoryLabel}</p>
+      ) : null}
     </Link>
   );
 }

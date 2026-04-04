@@ -1,11 +1,11 @@
 import { ContentStatus } from "@prisma/client";
+import { getPostPath } from "@/lib/routes";
 import type { PostItem } from "@/server/repositories/posts";
 import type { UpdateItem } from "@/server/repositories/updates";
 
 export const ADMIN_NAV_ITEMS = [
   { href: "/admin", label: "概览" },
-  { href: "/admin/compose", label: "撰写" },
-  { href: "/admin/manage", label: "管理" },
+  { href: "/admin/workbench", label: "编辑台" },
   { href: "/admin/settings", label: "设置" },
 ] as const;
 
@@ -50,6 +50,27 @@ export function formatCompactAdminDate(value: string | null) {
   }).format(date);
 }
 
+export function formatAdminDateTime(value: string | null) {
+  if (!value) {
+    return "Unknown";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 export function getPublishedCount(posts: PostItem[], updates: UpdateItem[]) {
   return (
     posts.filter((item) => item.status === ContentStatus.PUBLISHED).length +
@@ -71,7 +92,7 @@ export function getRecentItems(posts: PostItem[], updates: UpdateItem[]) {
       kind: "Post" as const,
       title: item.title,
       slug: item.slug,
-      href: `/posts/${item.slug}`,
+      href: getPostPath({ slug: item.slug, categorySlug: item.category?.slug }),
       status: item.status,
       updatedAt: item.updatedAt,
       publishedAt: item.publishedAt,

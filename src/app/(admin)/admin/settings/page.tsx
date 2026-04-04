@@ -1,4 +1,4 @@
-import { AdminPageHeader, AdminSectionCard, EmptyPanel } from "@/app/(admin)/admin/ui";
+import { AdminSectionCard, EmptyPanel } from "@/app/(admin)/admin/ui";
 import { getSiteSettings } from "@/server/repositories/site";
 
 export default async function AdminSettingsPage() {
@@ -6,8 +6,6 @@ export default async function AdminSettingsPage() {
 
   return (
     <div className="grid gap-8">
-      <AdminPageHeader eyebrow="Settings" title="设置" />
-
       <AdminSectionCard title="站点信息" eyebrow="Site">
         {siteSettings ? (
           <div className="grid gap-4 md:grid-cols-2">

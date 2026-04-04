@@ -1,4 +1,5 @@
 import { getContentText } from "@/lib/content";
+import { getPostPath } from "@/lib/routes";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 import { listAllPublishedPosts } from "@/server/repositories/posts";
 
@@ -9,7 +10,7 @@ export async function GET() {
 
   const items = posts
     .map((post) => {
-      const postUrl = absoluteUrl(`/posts/${post.slug}`);
+      const postUrl = absoluteUrl(getPostPath({ slug: post.slug, categorySlug: post.category?.slug }));
       const pubDate = new Date(post.publishedAt ?? Date.now()).toUTCString();
       const description = escapeXml(post.summary ?? "");
       const title = escapeXml(post.title);

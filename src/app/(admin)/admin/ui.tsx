@@ -1,5 +1,4 @@
 import { ContentStatus } from "@prisma/client";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { formatAdminDate } from "@/app/(admin)/admin/utils";
 import type { PostItem } from "@/server/repositories/posts";
@@ -75,14 +74,14 @@ export function StatCard({
 export function StatusBadge({ status }: { status: ContentStatus }) {
   const className =
     status === ContentStatus.PUBLISHED
-      ? "border-emerald-200/70 text-emerald-700 dark:border-emerald-900/70 dark:text-emerald-300"
+      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/25 dark:text-emerald-300"
       : status === ContentStatus.DRAFT
-        ? "border-amber-200/70 text-amber-700 dark:border-amber-900/70 dark:text-amber-300"
-        : "border-zinc-200/80 text-zinc-600 dark:border-zinc-800/80 dark:text-zinc-400";
+        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/25 dark:text-amber-300"
+        : "bg-zinc-100 text-zinc-600 dark:bg-zinc-900/60 dark:text-zinc-400";
 
   return (
     <span
-      className={`inline-flex border px-2 py-1 text-[0.72rem] font-medium uppercase tracking-[0.12em] ${className}`}
+      className={`inline-flex rounded-full px-2 py-0.5 text-[0.66rem] font-medium uppercase tracking-[0.12em] ${className}`}
     >
       {status}
     </span>
@@ -124,88 +123,71 @@ export function ContentListPanel<T extends PostItem | UpdateItem>({
   eyebrow,
   items,
   emptyText,
-  getHref,
   renderMeta,
   renderActions,
+  showHeader = true,
 }: {
   title: string;
   eyebrow: string;
   items: T[];
   emptyText: string;
-  getHref: (item: T) => string;
   renderMeta: (item: T) => ReactNode;
   renderActions: (item: T) => ReactNode;
+  showHeader?: boolean;
 }) {
   return (
-    <AdminSectionCard title={title} eyebrow={eyebrow}>
-      {items.length > 0 ? (
-        <div className="grid gap-4">
-          {items.map((item) => (
-            <article
-              key={item.id}
-              className="border-b border-zinc-200/80 pb-6 last:border-b-0 dark:border-zinc-800/80"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500">
-                    <StatusBadge status={item.status} />
-                    <span>{item.slug}</span>
-                  </div>
-                  <h3 className="mt-3 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                    {item.title}
-                  </h3>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                    {renderMeta(item)}
-                  </div>
-                  {item.summary ? (
-                    <p className="mt-3 text-sm leading-7 text-zinc-600 dark:text-zinc-300">
-                      {item.summary}
-                    </p>
-                  ) : null}
-                  {item.tags.length > 0 ? (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {item.tags.map((tag) => (
-                        <span
-                          key={tag.id}
-                          className="border border-zinc-200/80 bg-zinc-50/80 px-2.5 py-1 text-[0.72rem] font-medium text-zinc-500 dark:border-zinc-800/80 dark:bg-zinc-900/60 dark:text-zinc-400"
-                        >
-                          #{tag.name}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-wrap gap-2">{renderActions(item)}</div>
-              </div>
-
-              <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-zinc-200/80 pt-4 text-xs text-zinc-400 dark:border-zinc-800/80 dark:text-zinc-500">
-                <span>Updated {formatAdminDate(item.updatedAt)}</span>
-                <span>·</span>
-                <span>
-                  {item.publishedAt
-                    ? `Published ${formatAdminDate(item.publishedAt)}`
-                    : "Not published yet"}
-                </span>
-                <span>·</span>
-                {item.status === ContentStatus.PUBLISHED ? (
-                  <Link
-                    href={getHref(item)}
-                    className="font-medium text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-                  >
-                    Public path
-                  </Link>
-                ) : (
-                  <span>{getHref(item)}</span>
-                )}
-              </div>
-            </article>
-          ))}
+    <section className="border-b border-zinc-200/80 pb-5 dark:border-zinc-800/80">
+      {showHeader ? (
+        <div>
+          <p className="text-[0.68rem] font-medium uppercase tracking-[0.24em] text-zinc-400 dark:text-zinc-500">
+            {eyebrow}
+          </p>
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+            {title}
+          </h2>
         </div>
-      ) : (
-        <EmptyPanel text={emptyText} />
-      )}
-    </AdminSectionCard>
+      ) : null}
+
+      <div className={showHeader ? "mt-6" : ""}>
+        {items.length > 0 ? (
+          <div className="grid gap-4">
+            {items.map((item) => (
+              <article
+                key={item.id}
+                className="border-b border-zinc-200/80 pb-5 last:border-b-0 dark:border-zinc-800/80"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                      {item.title}
+                    </h3>
+                    {"draftSnapshot" in item &&
+                      item.status === ContentStatus.PUBLISHED &&
+                      item.draftSnapshot ? (
+                        <span className="inline-flex items-center border border-amber-200/80 bg-amber-50/80 px-2 py-0.5 text-[0.68rem] font-medium text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/20 dark:text-amber-300">
+                          有修订
+                        </span>
+                      ) : null}
+                  </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs leading-6 text-zinc-500 dark:text-zinc-400">
+                      <StatusBadge status={item.status} />
+                      {renderMeta(item)}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex flex-col items-end gap-2">{renderActions(item)}</div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyPanel text={emptyText} />
+        )}
+      </div>
+    </section>
   );
 }
 

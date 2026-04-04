@@ -47,6 +47,18 @@ export function readStoredThemeMode() {
   return resolveThemeMode(readStoredThemeModePreference());
 }
 
+export function applyStoredThemeMode() {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const preference = readStoredThemeModePreference();
+  const mode = resolveThemeMode(preference);
+
+  document.documentElement.dataset.theme = mode;
+  document.documentElement.dataset.themePreference = preference;
+}
+
 export function setThemeModePreference(mode: string) {
   const nextPreference = getThemeModePreference(mode);
   const nextMode = resolveThemeMode(nextPreference);

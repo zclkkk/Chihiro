@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type ArchiveItem = {
-  id: string;
+  id: string | number;
   href: string;
   title: string;
   publishedAt: string | null;
@@ -117,7 +117,7 @@ export function ArchiveTimeline({ groups }: ArchiveTimelineProps) {
 
                   <div className="space-y-4">
                     {monthGroup.items.map((item) => (
-                      <article key={item.id} className="relative pl-2">
+                      <article key={`${item.kindLabel}-${item.id}`} className="relative pl-2">
                         <Link href={item.href} className="group block py-1.5 transition">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex flex-wrap items-center gap-2 text-xs font-medium tracking-[0.14em] text-zinc-400 dark:text-zinc-500">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatContentTerm, getContentText } from "@/lib/content";
+import { getPostPath } from "@/lib/routes";
 import { SearchDialog } from "@/components/search-dialog";
 import { PostTagsPanel } from "@/components/post-tags-panel";
 import { RelativeDate } from "@/components/relative-date";
@@ -26,7 +27,11 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
   const allPosts = await listAllPublishedPosts();
 
   const filteredPosts = allPosts.filter((post) => {
-    if (category && post.category?.slug !== category) {
+    if (category === "uncategorized") {
+      if (post.category) {
+        return false;
+      }
+    } else if (category && post.category?.slug !== category) {
       return false;
     }
 
@@ -167,7 +172,9 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
                 className="border-b border-zinc-200/80 pb-6 last:border-b-0 dark:border-zinc-800/80"
               >
                 <h2 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-                  <Link href={`/posts/${post.slug}`}>{post.title}</Link>
+                  <Link href={getPostPath({ slug: post.slug, categorySlug: post.category?.slug })}>
+                    {post.title}
+                  </Link>
                 </h2>
                 <p className="reading-copy mt-3 text-sm leading-7 text-zinc-600 dark:text-zinc-300">
                   {post.summary ?? "No summary yet."}
@@ -272,7 +279,7 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
                 idleState="Search by title, tag, category, or a line from the post."
                 items={allPosts.map((post) => ({
                   id: post.id,
-                  href: `/posts/${post.slug}`,
+                  href: getPostPath({ slug: post.slug, categorySlug: post.category?.slug }),
                   title: post.title,
                   publishedAt: post.publishedAt,
                   overline: post.category?.name ?? "Uncategorized",
@@ -406,6 +413,10 @@ function getTagItems(
 }
 
 function getCategoryFilterLabel(slug: string, posts: PublishedPost[]) {
+  if (slug === "uncategorized") {
+    return "未分类";
+  }
+
   return posts.find((post) => post.category?.slug === slug)?.category?.name ?? formatContentTerm(slug);
 }
 

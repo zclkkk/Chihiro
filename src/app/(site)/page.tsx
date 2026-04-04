@@ -28,10 +28,12 @@ export default async function HomePage() {
               aria-label="<Developer />"
             >
               <span className="hero-copy-typewriter-ghost" aria-hidden="true">
-                &lt;Developer /&gt;
+                &lt;Developer <span className="hero-copy-typewriter-closing">/</span>
+                <span className="hero-copy-typewriter-angle">&gt;</span>
               </span>
               <span className="hero-copy-typewriter-text" aria-hidden="true">
-                &lt;Developer /&gt;
+                &lt;Developer <span className="hero-copy-typewriter-closing">/</span>
+                <span className="hero-copy-typewriter-angle">&gt;</span>
               </span>
             </span>{" "}
             <span className="hero-copy-emphasis font-medium italic text-zinc-900 dark:text-zinc-100">

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, JetBrains_Mono, Noto_Serif_SC } from "next/font/google";
+import { ThemeModeInit } from "@/components/theme-mode-init";
 import { siteConfig } from "@/lib/site";
-import { getThemeModeInitScript } from "@/lib/theme-mode";
 import "./globals.css";
 
 const uiSans = Geist({
@@ -44,7 +44,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full overflow-x-hidden">
-        <script dangerouslySetInnerHTML={{ __html: getThemeModeInitScript() }} />
+        <ThemeModeInit />
         {children}
       </body>
     </html>

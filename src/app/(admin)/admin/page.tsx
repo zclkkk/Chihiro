@@ -1,4 +1,4 @@
-import { AdminPageHeader, StatCard } from "@/app/(admin)/admin/ui";
+import { StatCard } from "@/app/(admin)/admin/ui";
 import {
   formatCompactAdminDate,
   getDraftCount,
@@ -14,8 +14,6 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className="grid gap-8">
-      <AdminPageHeader eyebrow="Overview" title="概览" />
-
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard label="总内容数" value={posts.length + updates.length} />
         <StatCard label="已发布" value={getPublishedCount(posts, updates)} tone="success" />

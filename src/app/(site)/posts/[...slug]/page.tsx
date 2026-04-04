@@ -1,24 +1,63 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { getParagraphsFromContent } from "@/lib/content";
+import { getPostPath } from "@/lib/routes";
 import { RelativeDate } from "@/components/relative-date";
-import { getPublishedPostBySlug, getPublishedPostSlugs } from "@/server/repositories/posts";
+import {
+  getPublishedPostByCategoryAndSlug,
+  getPublishedPostBySlug,
+  getPublishedPostRouteParams,
+  getPublishedPostSlugs,
+} from "@/server/repositories/posts";
 
 type PostPageProps = {
   params: Promise<{
-    slug: string;
+    slug: string[];
   }>;
 };
 
+function getRouteState(segments: string[]) {
+  if (segments.length === 1) {
+    return {
+      category: null,
+      slug: segments[0],
+    };
+  }
+
+  if (segments.length === 2) {
+    return {
+      category: segments[0],
+      slug: segments[1],
+    };
+  }
+
+  return null;
+}
+
 export async function generateStaticParams() {
-  const slugs = await getPublishedPostSlugs();
-  return slugs.map((slug) => ({ slug }));
+  const [routeParams, slugs] = await Promise.all([
+    getPublishedPostRouteParams(),
+    getPublishedPostSlugs(),
+  ]);
+
+  return [
+    ...routeParams.map(({ category, slug }) => ({ slug: [category, slug] })),
+    ...slugs.map((slug) => ({ slug: [slug] })),
+  ];
 }
 
 export async function generateMetadata({ params }: PostPageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const post = await getPublishedPostBySlug(slug);
+  const { slug: segments } = await params;
+  const routeState = getRouteState(segments);
+
+  if (!routeState) {
+    return {
+      title: "Post not found",
+    };
+  }
+
+  const post = await getPublishedPostBySlug(routeState.slug);
 
   if (!post) {
     return {
@@ -33,10 +72,32 @@ export async function generateMetadata({ params }: PostPageProps): Promise<Metad
 }
 
 export default async function PostPage({ params }: PostPageProps) {
-  const { slug } = await params;
-  const post = await getPublishedPostBySlug(slug);
+  const { slug: segments } = await params;
+  const routeState = getRouteState(segments);
+
+  if (!routeState) {
+    notFound();
+  }
+
+  if (!routeState.category) {
+    const post = await getPublishedPostBySlug(routeState.slug);
+
+    if (!post) {
+      notFound();
+    }
+
+    permanentRedirect(getPostPath({ slug: post.slug, categorySlug: post.category?.slug }));
+  }
+
+  const post = await getPublishedPostByCategoryAndSlug(routeState.category, routeState.slug);
 
   if (!post) {
+    const canonicalPost = await getPublishedPostBySlug(routeState.slug);
+
+    if (canonicalPost) {
+      permanentRedirect(getPostPath({ slug: canonicalPost.slug, categorySlug: canonicalPost.category?.slug }));
+    }
+
     notFound();
   }
 

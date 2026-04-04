@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { getPostPath } from "@/lib/routes";
+import { requireAdminSession } from "@/server/auth";
 import {
+  deletePostById,
   publishPostById,
   unpublishPostById,
 } from "@/server/repositories/posts";
@@ -12,42 +15,57 @@ import {
 } from "@/server/repositories/updates";
 
 export async function publishPostAction(formData: FormData) {
-  const id = getRequiredString(formData, "id");
+  await requireAdminSession();
+  const id = getRequiredPostId(formData, "id");
   const post = await publishPostById(id);
 
-  revalidatePostSurface(post.slug);
-  redirect("/admin");
+  revalidatePostSurface(post.slug, post.category?.slug);
+  redirect("/admin/workbench?tab=posts");
 }
 
 export async function unpublishPostAction(formData: FormData) {
-  const id = getRequiredString(formData, "id");
+  await requireAdminSession();
+  const id = getRequiredPostId(formData, "id");
   const post = await unpublishPostById(id);
 
-  revalidatePostSurface(post.slug);
-  redirect("/admin");
+  revalidatePostSurface(post.slug, post.category?.slug);
+  redirect("/admin/workbench?tab=posts");
+}
+
+export async function deletePostAction(formData: FormData) {
+  await requireAdminSession();
+  const id = getRequiredPostId(formData, "id");
+  const post = await deletePostById(id);
+
+  revalidatePostSurface(post.slug, post.category?.slug);
+  redirect("/admin/workbench?tab=posts");
 }
 
 export async function publishUpdateAction(formData: FormData) {
-  const id = getRequiredString(formData, "id");
+  await requireAdminSession();
+  const id = getRequiredId(formData, "id");
   const update = await publishUpdateById(id);
 
   revalidateUpdateSurface(update.slug);
-  redirect("/admin");
+  redirect("/admin/workbench?tab=updates");
 }
 
 export async function unpublishUpdateAction(formData: FormData) {
-  const id = getRequiredString(formData, "id");
+  await requireAdminSession();
+  const id = getRequiredId(formData, "id");
   const update = await unpublishUpdateById(id);
 
   revalidateUpdateSurface(update.slug);
-  redirect("/admin");
+  redirect("/admin/workbench?tab=updates");
 }
 
-function revalidatePostSurface(slug: string) {
+function revalidatePostSurface(slug: string, categorySlug?: string | null) {
   revalidatePath("/admin");
+  revalidatePath("/admin/workbench");
   revalidatePath("/");
   revalidatePath("/archives");
   revalidatePath("/posts");
+  revalidatePath(getPostPath({ slug, categorySlug }));
   revalidatePath(`/posts/${slug}`);
   revalidatePath("/rss.xml");
   revalidatePath("/sitemap.xml");
@@ -55,6 +73,7 @@ function revalidatePostSurface(slug: string) {
 
 function revalidateUpdateSurface(slug: string) {
   revalidatePath("/admin");
+  revalidatePath("/admin/workbench");
   revalidatePath("/");
   revalidatePath("/archives");
   revalidatePath("/updates");
@@ -71,4 +90,24 @@ function getRequiredString(formData: FormData, key: string) {
   }
 
   return value;
+}
+
+function getRequiredPostId(formData: FormData, key: string) {
+  const value = getRequiredString(formData, key);
+
+  if (!/^\d+$/.test(value)) {
+    throw new Error("请填写有效的文章编号。");
+  }
+
+  return Number(value);
+}
+
+function getRequiredId(formData: FormData, key: string) {
+  const value = getRequiredString(formData, key);
+
+  if (!/^\d+$/.test(value)) {
+    throw new Error("请填写有效的编号。");
+  }
+
+  return Number(value);
 }

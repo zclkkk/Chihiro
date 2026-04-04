@@ -30,29 +30,31 @@ enum AssetProvider {
 }
 
 model Post {
-  id            String        @id @default(cuid())
-  title         String
-  slug          String        @unique
-  summary       String?
-  status        ContentStatus @default(DRAFT)
-  content       Json?
-  contentHtml   String?
-  authorName    String?
-  publishedAt   DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  categoryId    String?
-  coverAssetId  String?
-  category      Category?     @relation("PostCategory", fields: [categoryId], references: [id], onDelete: SetNull)
-  coverAsset    Asset?        @relation("PostCoverAsset", fields: [coverAssetId], references: [id], onDelete: SetNull)
-  tags          PostTag[]
+  id                Int           @id @default(autoincrement())
+  title             String
+  slug              String        @unique
+  summary           String?
+  status            ContentStatus @default(DRAFT)
+  content           Json?
+  contentHtml       String?
+  authorName        String?
+  publishedAt       DateTime?
+  publishedSnapshot Json?
+  draftSnapshot     Json?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  categoryId        Int?
+  coverAssetId      String?
+  category          Category?     @relation("PostCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  coverAsset        Asset?        @relation("PostCoverAsset", fields: [coverAssetId], references: [id], onDelete: SetNull)
+  tags              PostTag[]
 
   @@index([status, publishedAt])
   @@index([categoryId])
 }
 
 model Update {
-  id            String        @id @default(cuid())
+  id            Int           @id @default(autoincrement())
   title         String
   slug          String        @unique
   summary       String?
@@ -60,9 +62,10 @@ model Update {
   content       Json?
   contentHtml   String?
   publishedAt   DateTime?
+  draftSnapshot Json?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  categoryId    String?
+  categoryId    Int?
   coverAssetId  String?
   category      Category?     @relation("UpdateCategory", fields: [categoryId], references: [id], onDelete: SetNull)
   coverAsset    Asset?        @relation("UpdateCoverAsset", fields: [coverAssetId], references: [id], onDelete: SetNull)
@@ -73,33 +76,34 @@ model Update {
 }
 
 model Asset {
-  id             String        @id @default(cuid())
-  provider       AssetProvider
-  kind           AssetKind
-  storageKey     String        @unique
-  bucket         String?
-  url            String
-  alt            String?
-  mimeType       String?
-  size           Int?
-  width          Int?
-  height         Int?
-  duration       Int?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  postCovers     Post[]        @relation("PostCoverAsset")
-  updateCovers   Update[]      @relation("UpdateCoverAsset")
+  id           String        @id @default(cuid())
+  provider     AssetProvider
+  kind         AssetKind
+  storageKey   String        @unique
+  bucket       String?
+  url          String
+  alt          String?
+  mimeType     String?
+  size         Int?
+  width        Int?
+  height       Int?
+  duration     Int?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  postCovers   Post[]        @relation("PostCoverAsset")
+  updateCovers Update[]      @relation("UpdateCoverAsset")
 }
 
 model Category {
-  id        String       @id @default(cuid())
-  kind      CategoryKind
-  name      String
-  slug      String
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  posts     Post[]       @relation("PostCategory")
-  updates   Update[]     @relation("UpdateCategory")
+  id          Int          @id @default(autoincrement())
+  kind        CategoryKind
+  name        String
+  slug        String
+  description String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  posts       Post[]       @relation("PostCategory")
+  updates     Update[]     @relation("UpdateCategory")
 
   @@unique([kind, slug])
   @@index([kind, name])
@@ -116,39 +120,60 @@ model Tag {
 }
 
 model PostTag {
-  postId      String
-  tagId       String
-  assignedAt  DateTime @default(now())
-  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  tag         Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  postId     Int
+  tagId      String
+  assignedAt DateTime @default(now())
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([postId, tagId])
   @@index([tagId])
 }
 
 model UpdateTag {
-  updateId    String
-  tagId       String
-  assignedAt  DateTime @default(now())
-  update      Update   @relation(fields: [updateId], references: [id], onDelete: Cascade)
-  tag         Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  updateId   Int
+  tagId      String
+  assignedAt DateTime @default(now())
+  update     Update   @relation(fields: [updateId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([updateId, tagId])
   @@index([tagId])
 }
 
 model SiteSettings {
-  id                String   @id @default("default")
-  siteName          String
-  siteDescription   String
-  siteUrl           String
-  locale            String   @default("zh-CN")
-  authorName        String
-  authorAvatarUrl   String?
-  summary           String?
-  motto             String?
-  email             String?
-  githubUrl         String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String   @id @default("default")
+  siteName        String
+  siteDescription String
+  siteUrl         String
+  locale          String   @default("zh-CN")
+  authorName      String
+  authorAvatarUrl String?
+  summary         String?
+  motto           String?
+  email           String?
+  githubUrl       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model AdminUser {
+  id           String         @id @default(cuid())
+  username     String         @unique
+  passwordHash String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  sessions     AdminSession[]
+}
+
+model AdminSession {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  userId    String
+  user      AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }

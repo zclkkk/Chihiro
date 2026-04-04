@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getContentText } from "@/lib/content";
+import { getPostPath } from "@/lib/routes";
 import { ArchiveTimeline, type ArchiveYearGroup } from "@/components/archive-timeline";
 import { SearchDialog } from "@/components/search-dialog";
 import { ScrollToTopLink } from "@/components/scroll-to-top-link";
@@ -16,7 +17,7 @@ type ArchivesPageProps = {
 type ArchiveType = "all" | "posts" | "updates";
 
 type ArchiveItem = {
-  id: string;
+  id: string | number;
   href: string;
   title: string;
   publishedAt: string | null;
@@ -122,7 +123,7 @@ function getArchiveItems(
 ): ArchiveItem[] {
   const postItems: ArchiveItem[] = posts.map((post) => ({
     id: post.id,
-    href: `/posts/${post.slug}`,
+    href: getPostPath({ slug: post.slug, categorySlug: post.category?.slug }),
     title: post.title,
     publishedAt: post.publishedAt,
     categoryLabel: post.category?.name ?? "Uncategorized",
