@@ -14,7 +14,7 @@ import { ContentPreviewDialog } from "@/app/(admin)/admin/compose/content-previe
 import { ConfirmActionDialog } from "@/app/(admin)/admin/confirm-action-dialog";
 import { PublishedAtField } from "@/app/(admin)/admin/compose/post/published-at-field";
 import { formatAdminDateTime } from "@/app/(admin)/admin/utils";
-import { renderPlainTextContentHtml } from "@/lib/content";
+import { getRenderedContentHtml } from "@/lib/content";
 import type { UpdateItem } from "@/server/repositories/updates";
 
 const initialState: SaveUpdateEditorState = {
@@ -175,7 +175,7 @@ function buildUpdatePreviewState(form: HTMLFormElement | null, authorName: strin
   const content = getFormValue(formData, "content");
   const publishedAt = getFormValue(formData, "publishedAt");
   const title = getPreviewTitle(content);
-  const body = renderPlainTextContentHtml(content) ?? "<p>暂无内容。</p>";
+  const body = getRenderedContentHtml(null, content) ?? "<p>暂无内容。</p>";
   const formattedPublishedAt = publishedAt ? formatAdminDateTime(publishedAt) : null;
 
   return {

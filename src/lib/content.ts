@@ -74,6 +74,22 @@ export function getContentPreview(contentHtml: string | null, content: unknown) 
   return getContentText(contentHtml, content) || "No preview available yet.";
 }
 
+export function getRenderedContentHtml(contentHtml: string | null, content: unknown) {
+  if (contentHtml?.trim()) {
+    return contentHtml;
+  }
+
+  const paragraphs = getParagraphsFromContent(content);
+
+  if (paragraphs.length === 0) {
+    return null;
+  }
+
+  return paragraphs
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br />")}</p>`)
+    .join("");
+}
+
 export function renderPlainTextContentHtml(content: string | null) {
   if (!content) {
     return null;

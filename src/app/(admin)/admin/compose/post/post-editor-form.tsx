@@ -15,7 +15,7 @@ import { ContentPreviewDialog } from "@/app/(admin)/admin/compose/content-previe
 import { ConfirmActionDialog } from "@/app/(admin)/admin/confirm-action-dialog";
 import { PublishedAtField } from "@/app/(admin)/admin/compose/post/published-at-field";
 import { formatAdminDateTime } from "@/app/(admin)/admin/utils";
-import { escapeHtmlText, renderPlainTextContentHtml } from "@/lib/content";
+import { escapeHtmlText, getRenderedContentHtml } from "@/lib/content";
 import { createCategoryAction } from "@/app/(admin)/admin/categories/actions";
 import { createTagAction } from "@/app/(admin)/admin/tags/actions";
 import type { CategoryOption } from "@/server/repositories/categories";
@@ -374,7 +374,7 @@ function buildPostPreviewState(
     selectedTags.length > 0
       ? selectedTags.map((tag) => `<span class="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">#${escapeHtmlText(tag.name)}</span>`).join("")
       : "";
-  const contentHtml = renderPlainTextContentHtml(content) ?? "<p>暂无内容。</p>";
+  const contentHtml = getRenderedContentHtml(null, content) ?? "<p>暂无内容。</p>";
   const formattedPublishedAt = publishedAt ? formatAdminDateTime(publishedAt) : null;
 
   return {

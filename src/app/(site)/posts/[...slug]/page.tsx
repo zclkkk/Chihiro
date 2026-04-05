@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { getParagraphsFromContent } from "@/lib/content";
+import { getRenderedContentHtml } from "@/lib/content";
 import { getPostPath } from "@/lib/routes";
 import { RelativeDate } from "@/components/relative-date";
 import {
@@ -101,6 +101,8 @@ export default async function PostPage({ params }: PostPageProps) {
     notFound();
   }
 
+  const renderedContentHtml = getRenderedContentHtml(post.contentHtml, post.content);
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-3xl px-6 py-16 sm:px-10">
       <article>
@@ -143,16 +145,14 @@ export default async function PostPage({ params }: PostPageProps) {
           </p>
         ) : null}
 
-        {post.contentHtml ? (
+        {renderedContentHtml ? (
           <div
             className="reading-copy mt-10 space-y-6 text-base leading-8 text-zinc-800 dark:text-zinc-200"
-            dangerouslySetInnerHTML={{ __html: post.contentHtml }}
+            dangerouslySetInnerHTML={{ __html: renderedContentHtml }}
           />
         ) : (
           <div className="reading-copy mt-10 space-y-6 text-base leading-8 text-zinc-800 dark:text-zinc-200">
-            {getParagraphsFromContent(post.content).map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
+            <p>暂无内容。</p>
           </div>
         )}
       </article>
