@@ -71,6 +71,9 @@ export function UpdateEditorForm({ update, authorName }: UpdateEditorFormProps) 
             </p>
 
             <label className="grid gap-2">
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                支持直接粘贴图片外链，或使用 <code>![alt](url)</code>。
+              </p>
               <textarea
                 name="content"
                 rows={16}

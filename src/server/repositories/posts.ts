@@ -116,7 +116,7 @@ export type SavePostDraftInput = {
   title: string;
   slug: string | null;
   summary: string | null;
-  content: string | null;
+  content: Prisma.JsonValue | null;
   contentHtml: string | null;
   status: ContentStatus;
   categoryId: number | null;

@@ -3,7 +3,7 @@
 import { ContentStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { renderPlainTextContentHtml } from "@/lib/content";
+import { renderSlateContentHtml, createSlateContentValue } from "@/lib/slate-content";
 import { getPostPath } from "@/lib/routes";
 import { requireAdminSession } from "@/server/auth";
 import {
@@ -31,7 +31,7 @@ export async function savePostDraftAction(
   const slugInput = getOptionalString(formData, "slug");
   const slug = slugInput ? normalizeSlug(slugInput) : null;
   const summary = getOptionalString(formData, "summary");
-  const content = getOptionalString(formData, "content");
+  const content = parseSlateContent(formData);
   const categoryId = getOptionalNumber(formData, "categoryId");
   const publishedAtInput = getOptionalString(formData, "publishedAt");
   const publishedAt = publishedAtInput ? parsePublishedAtInput(publishedAtInput) : null;
@@ -50,8 +50,8 @@ export async function savePostDraftAction(
       title,
       slug,
       summary,
-      content,
-      contentHtml: renderPlainTextContentHtml(content),
+      content: content as unknown as Prisma.JsonValue,
+      contentHtml: renderSlateContentHtml(content),
       status: currentStatus,
       categoryId,
       publishedAt,
@@ -169,6 +169,20 @@ function getOptionalNumber(formData: FormData, key: string) {
   }
 
   return Number(value);
+}
+
+function parseSlateContent(formData: FormData) {
+  const raw = getOptionalString(formData, "content");
+
+  if (!raw) {
+    return createSlateContentValue(null);
+  }
+
+  try {
+    return createSlateContentValue(JSON.parse(raw));
+  } catch {
+    throw new Error("请填写有效的正文内容。");
+  }
 }
 
 function getContentStatus(formData: FormData, key: string): ContentStatus {

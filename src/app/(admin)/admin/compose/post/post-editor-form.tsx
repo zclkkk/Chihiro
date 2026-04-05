@@ -14,10 +14,12 @@ import { ContentEditorShell } from "@/app/(admin)/admin/compose/content-editor-s
 import { ContentPreviewDialog } from "@/app/(admin)/admin/compose/content-preview-dialog";
 import { ConfirmActionDialog } from "@/app/(admin)/admin/confirm-action-dialog";
 import { PublishedAtField } from "@/app/(admin)/admin/compose/post/published-at-field";
+import { PostRichTextEditor } from "@/app/(admin)/admin/compose/post/post-rich-text-editor";
 import { formatAdminDateTime } from "@/app/(admin)/admin/utils";
-import { escapeHtmlText, getRenderedContentHtml } from "@/lib/content";
+import { escapeHtmlText, stripHtml } from "@/lib/content";
 import { createCategoryAction } from "@/app/(admin)/admin/categories/actions";
 import { createTagAction } from "@/app/(admin)/admin/tags/actions";
+import { createSlateContentValue } from "@/lib/slate-content";
 import type { CategoryOption } from "@/server/repositories/categories";
 import type { TagOption } from "@/server/repositories/tags";
 import type { PostItem } from "@/server/repositories/posts";
@@ -61,16 +63,11 @@ export function PostEditorForm({ post, categories, tags, siteUrlBase, authorName
   const draftSavedAt = getDraftSavedAt(post);
   const hasSavedRevision = Boolean(post?.status === ContentStatus.PUBLISHED && draftSavedAt);
   const bottomPrompt = getBottomPrompt(post, draftSavedAt);
-  const contentValue =
-    typeof editablePost?.content === "string"
-      ? editablePost.content
-      : editablePost?.contentHtml
-        ? ""
-        : "";
   const selectedCategorySlug =
     categoryItems.find((category) => String(category.id) === selectedCategoryId)?.slug ??
     "uncategorized";
   const postUrlPrefix = `${siteUrlBase}/posts/${selectedCategorySlug}/`;
+  const initialContentValue = createSlateContentValue(editablePost?.content);
 
   return (
     <>
@@ -123,15 +120,7 @@ export function PostEditorForm({ post, categories, tags, siteUrlBase, authorName
               />
             </label>
 
-            <label className="grid gap-2">
-              <textarea
-                name="content"
-                rows={16}
-                defaultValue={contentValue}
-                placeholder="先用纯文本写内容。保存时会按段落自动生成基础 HTML。"
-                className="min-h-[26rem] border-none bg-transparent px-0 py-1 text-lg leading-9 text-zinc-800 outline-none transition placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
-              />
-            </label>
+            <PostRichTextEditor initialValue={initialContentValue} />
           </>
         }
         sidebar={
@@ -357,7 +346,7 @@ function buildPostPreviewState(
   const formData = new FormData(form);
   const title = getFormValue(formData, "title") || "未命名文章";
   const summary = getFormValue(formData, "summary");
-  const content = getFormValue(formData, "content");
+  const contentHtml = getFormValue(formData, "contentHtml");
   const categoryId = getFormValue(formData, "categoryId");
   const selectedTagIds = new Set(
     formData
@@ -374,7 +363,7 @@ function buildPostPreviewState(
     selectedTags.length > 0
       ? selectedTags.map((tag) => `<span class="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">#${escapeHtmlText(tag.name)}</span>`).join("")
       : "";
-  const contentHtml = getRenderedContentHtml(null, content) ?? "<p>暂无内容。</p>";
+  const previewContentHtml = contentHtml && stripHtml(contentHtml) ? contentHtml : "<p>暂无内容。</p>";
   const formattedPublishedAt = publishedAt ? formatAdminDateTime(publishedAt) : null;
 
   return {
@@ -392,7 +381,7 @@ function buildPostPreviewState(
           ${tagLabels}
         </div>
         <div class="reading-copy mt-10 space-y-6 text-base leading-8 text-zinc-800 dark:text-zinc-200">
-          ${contentHtml}
+          ${previewContentHtml}
         </div>
       </article>
     `,
