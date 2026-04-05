@@ -70,6 +70,38 @@ export function getContentText(contentHtml: string | null, content: unknown) {
   return getParagraphsFromContent(content).join(" ");
 }
 
+export function getContentPreview(contentHtml: string | null, content: unknown) {
+  return getContentText(contentHtml, content) || "No preview available yet.";
+}
+
+export function renderPlainTextContentHtml(content: string | null) {
+  if (!content) {
+    return null;
+  }
+
+  const paragraphs = content
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  if (paragraphs.length === 0) {
+    return null;
+  }
+
+  return paragraphs
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br />")}</p>`)
+    .join("");
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function collectText(nodes: unknown[]) {
   const textParts: string[] = [];
 
@@ -101,4 +133,13 @@ function collectText(nodes: unknown[]) {
 
 function isRichTextNode(value: unknown): value is RichTextNode {
   return typeof value === "object" && value !== null;
+}
+
+export function escapeHtmlText(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

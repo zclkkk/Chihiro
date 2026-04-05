@@ -16,6 +16,7 @@ import type { TagItem } from "@/server/repositories/tags";
 const initialState: SaveTagEditorState = {
   error: null,
   redirectTo: null,
+  createdTag: null,
 };
 
 type TagEditorFormProps = {
@@ -72,12 +73,8 @@ export function TagEditorForm({ tag }: TagEditorFormProps) {
         {tag ? (
           <div className="grid gap-3 rounded-2xl border border-zinc-200/80 bg-white/70 p-4 text-sm text-zinc-600 dark:border-zinc-800/80 dark:bg-zinc-950/40 dark:text-zinc-300">
             <div className="flex items-center justify-between gap-4">
-              <span>关联文章</span>
-              <span className="font-medium text-zinc-950 dark:text-zinc-50">{tag.contentCount}</span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
               <span>文章</span>
-              <span>{tag.postCount}</span>
+              <span className="font-medium text-zinc-950 dark:text-zinc-50">{tag.postCount}</span>
             </div>
           </div>
         ) : null}

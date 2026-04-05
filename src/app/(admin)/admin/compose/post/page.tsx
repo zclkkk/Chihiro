@@ -36,6 +36,7 @@ export default async function AdminComposePostPage({
         categories={categories}
         tags={tags}
         siteUrlBase={siteUrlBase}
+        authorName={siteSettings?.authorName ?? siteConfig.author}
       />
     </div>
   );

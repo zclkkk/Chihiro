@@ -14,6 +14,7 @@ import type { CategoryOption } from "@/server/repositories/categories";
 const initialState: SaveCategoryEditorState = {
   error: null,
   redirectTo: null,
+  createdCategory: null,
 };
 
 type CategoryEditorFormProps = {

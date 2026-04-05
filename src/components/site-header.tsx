@@ -1001,19 +1001,21 @@ function MegaNavRecentEntry({
       onClick={onNavigate}
       className="group rounded-[0.95rem] px-2 py-2 transition-colors duration-200 hover:bg-zinc-50/90 dark:hover:bg-zinc-900/70"
     >
-      <div className="flex items-center justify-between gap-3">
-        {!compact && kind ? (
-          <span className="text-[0.68rem] font-medium tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
-            {kind}
-          </span>
-        ) : null}
-        <span className="text-xs text-zinc-400 dark:text-zinc-500">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          {!compact && kind ? (
+            <span className="text-[0.68rem] font-medium tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
+              {kind}
+            </span>
+          ) : null}
+          <p className={`${compact ? "text-sm" : "mt-1 text-sm"} font-medium text-zinc-900 transition group-hover:text-primary dark:text-zinc-100 dark:group-hover:text-sky-300`}>
+            {title}
+          </p>
+        </div>
+        <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
           <RelativeDate value={dateValue} />
         </span>
       </div>
-      <p className="mt-1 text-sm font-medium text-zinc-900 transition group-hover:text-primary dark:text-zinc-100 dark:group-hover:text-sky-300">
-        {title}
-      </p>
       {!compact && categoryLabel ? (
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{categoryLabel}</p>
       ) : null}

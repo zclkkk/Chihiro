@@ -2,7 +2,8 @@
 
 import { ContentStatus } from "@prisma/client";
 import { Check } from "lucide-react";
-import { useActionState, useState } from "react";
+import { createPortal } from "react-dom";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
   discardPostRevisionAction,
@@ -10,9 +11,13 @@ import {
   type SavePostEditorState,
 } from "@/app/(admin)/admin/compose/post/actions";
 import { ContentEditorShell } from "@/app/(admin)/admin/compose/content-editor-shell";
+import { ContentPreviewDialog } from "@/app/(admin)/admin/compose/content-preview-dialog";
 import { ConfirmActionDialog } from "@/app/(admin)/admin/confirm-action-dialog";
 import { PublishedAtField } from "@/app/(admin)/admin/compose/post/published-at-field";
 import { formatAdminDateTime } from "@/app/(admin)/admin/utils";
+import { escapeHtmlText, renderPlainTextContentHtml } from "@/lib/content";
+import { createCategoryAction } from "@/app/(admin)/admin/categories/actions";
+import { createTagAction } from "@/app/(admin)/admin/tags/actions";
 import type { CategoryOption } from "@/server/repositories/categories";
 import type { TagOption } from "@/server/repositories/tags";
 import type { PostItem } from "@/server/repositories/posts";
@@ -26,17 +31,33 @@ type PostEditorFormProps = {
   categories: CategoryOption[];
   tags: TagOption[];
   siteUrlBase: string;
+  authorName: string;
 };
 
-export function PostEditorForm({ post, categories, tags, siteUrlBase }: PostEditorFormProps) {
+type PostPreviewState = {
+  title: string;
+  subtitle: string | null;
+  meta: string;
+  body: string;
+};
+
+export function PostEditorForm({ post, categories, tags, siteUrlBase, authorName }: PostEditorFormProps) {
   const [state, formAction] = useActionState(savePostDraftAction, initialState);
   const editablePost = getEditablePost(post);
+  const [categoryItems, setCategoryItems] = useState(() => sortCategories(categories));
+  const [tagItems, setTagItems] = useState(() => sortTags(tags));
   const [selectedTagIds, setSelectedTagIds] = useState(
     () => new Set(editablePost?.tags.map((tag) => tag.id) ?? []),
   );
   const [selectedCategoryId, setSelectedCategoryId] = useState(
     editablePost?.category?.id ? String(editablePost.category.id) : "",
   );
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
+  const [previewState, setPreviewState] = useState<PostPreviewState | null>(null);
+  const handleCreatedCategoryRef = useRef<(category: CategoryOption) => void>(() => {});
+  const handleCreatedTagRef = useRef<(tag: TagOption) => void>(() => {});
+  const formRef = useRef<HTMLFormElement | null>(null);
   const draftSavedAt = getDraftSavedAt(post);
   const hasSavedRevision = Boolean(post?.status === ContentStatus.PUBLISHED && draftSavedAt);
   const bottomPrompt = getBottomPrompt(post, draftSavedAt);
@@ -47,166 +68,235 @@ export function PostEditorForm({ post, categories, tags, siteUrlBase }: PostEdit
         ? ""
         : "";
   const selectedCategorySlug =
-    categories.find((category) => String(category.id) === selectedCategoryId)?.slug ??
+    categoryItems.find((category) => String(category.id) === selectedCategoryId)?.slug ??
     "uncategorized";
   const postUrlPrefix = `${siteUrlBase}/posts/${selectedCategorySlug}/`;
 
   return (
-    <ContentEditorShell
-      formAction={formAction}
-      hiddenFields={
-        <>
-          <input type="hidden" name="postId" value={post?.id ?? ""} />
-          <input type="hidden" name="currentStatus" value={post?.status ?? ContentStatus.DRAFT} />
-        </>
-      }
-      stateError={state.error}
-      main={
-        <>
-          <div className="grid gap-2">
-            <input
-              id="title"
-              name="title"
-              type="text"
-              required
-              defaultValue={editablePost?.title ?? ""}
-              placeholder="输入文章标题"
-              className="h-14 border-b border-zinc-200/80 bg-transparent px-0 text-3xl font-semibold tracking-tight text-zinc-950 outline-none transition placeholder:text-zinc-300 focus:border-primary/50 dark:border-zinc-800/80 dark:text-zinc-50 dark:placeholder:text-zinc-600"
-            />
-          </div>
-
-          <label className="grid gap-2">
-            <div className="flex items-center border-b border-zinc-200/80 text-sm text-zinc-600 transition focus-within:border-primary/50 dark:border-zinc-800/80 dark:text-zinc-300">
-              <span className="shrink-0 whitespace-nowrap text-zinc-600 dark:text-zinc-300">
-                {postUrlPrefix}
-              </span>
+    <>
+      <ContentEditorShell
+        formRef={formRef}
+        formAction={formAction}
+        hiddenFields={
+          <>
+            <input type="hidden" name="postId" value={post?.id ?? ""} />
+            <input type="hidden" name="currentStatus" value={post?.status ?? ContentStatus.DRAFT} />
+          </>
+        }
+        stateError={state.error}
+        main={
+          <>
+            <div className="grid gap-2">
               <input
-                name="slug"
+                id="title"
+                name="title"
                 type="text"
-                defaultValue={editablePost?.slug ?? ""}
-                placeholder="留空则根据id生成"
-                className="h-11 min-w-0 flex-1 bg-transparent px-0 outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+                required
+                defaultValue={editablePost?.title ?? ""}
+                placeholder="输入文章标题"
+                className="h-14 border-b border-zinc-200/80 bg-transparent px-0 text-3xl font-semibold tracking-tight text-zinc-950 outline-none transition placeholder:text-zinc-300 focus:border-primary/50 dark:border-zinc-800/80 dark:text-zinc-50 dark:placeholder:text-zinc-600"
               />
             </div>
-          </label>
 
-          <label className="grid gap-2">
-            <textarea
-              name="summary"
-              rows={3}
-              defaultValue={editablePost?.summary ?? ""}
-              placeholder="为文章写一段简短介绍"
-              className="min-h-28 border-b border-zinc-200/80 bg-transparent px-0 py-2 text-base leading-8 text-zinc-600 outline-none transition placeholder:text-zinc-400 focus:border-primary/50 dark:border-zinc-800/80 dark:text-zinc-300 dark:placeholder:text-zinc-600"
-            />
-          </label>
+            <label className="grid gap-2">
+              <div className="flex items-center border-b border-zinc-200/80 text-sm text-zinc-600 transition focus-within:border-primary/50 dark:border-zinc-800/80 dark:text-zinc-300">
+                <span className="shrink-0 whitespace-nowrap text-zinc-600 dark:text-zinc-300">
+                  {postUrlPrefix}
+                </span>
+                <input
+                  name="slug"
+                  type="text"
+                  defaultValue={editablePost?.slug ?? ""}
+                  placeholder="留空则根据id生成"
+                  className="h-11 min-w-0 flex-1 bg-transparent px-0 outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+                />
+              </div>
+            </label>
 
-          <label className="grid gap-2">
-            <textarea
-              name="content"
-              rows={16}
-              defaultValue={contentValue}
-              placeholder="先用纯文本写内容。保存时会按段落自动生成基础 HTML。"
-              className="min-h-[26rem] border-none bg-transparent px-0 py-1 text-lg leading-9 text-zinc-800 outline-none transition placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
-            />
-          </label>
-        </>
-      }
-      sidebar={
-        <>
-          <label className="grid gap-2 border-t border-zinc-200/80 pt-5 dark:border-zinc-800/80">
-            <span className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
-              发布日期
-            </span>
-            <PublishedAtField defaultValue={editablePost?.publishedAt} />
-          </label>
+            <label className="grid gap-2">
+              <textarea
+                name="summary"
+                rows={3}
+                defaultValue={editablePost?.summary ?? ""}
+                placeholder="为文章写一段简短介绍"
+                className="min-h-28 border-b border-zinc-200/80 bg-transparent px-0 py-2 text-base leading-8 text-zinc-600 outline-none transition placeholder:text-zinc-400 focus:border-primary/50 dark:border-zinc-800/80 dark:text-zinc-300 dark:placeholder:text-zinc-600"
+              />
+            </label>
 
-          <label className="grid gap-3 border-t border-zinc-200/80 pt-5 dark:border-zinc-800/80">
-            <span className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
-              分类
-            </span>
+            <label className="grid gap-2">
+              <textarea
+                name="content"
+                rows={16}
+                defaultValue={contentValue}
+                placeholder="先用纯文本写内容。保存时会按段落自动生成基础 HTML。"
+                className="min-h-[26rem] border-none bg-transparent px-0 py-1 text-lg leading-9 text-zinc-800 outline-none transition placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
+              />
+            </label>
+          </>
+        }
+        sidebar={
+          <>
+            <label className="grid gap-2 border-t border-zinc-200/80 pt-5 dark:border-zinc-800/80">
+              <span className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
+                发布日期
+              </span>
+              <PublishedAtField defaultValue={editablePost?.publishedAt} />
+            </label>
+
+            <label className="grid gap-3 border-t border-zinc-200/80 pt-5 dark:border-zinc-800/80">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
+                  分类
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryDialogOpen(true)}
+                  className="text-xs font-medium text-zinc-500 transition hover:text-primary dark:text-zinc-400 dark:hover:text-sky-300"
+                >
+                  创建分类
+                </button>
+              </div>
             <select
               name="categoryId"
-              defaultValue={editablePost?.category?.id ? String(editablePost.category.id) : ""}
+              value={selectedCategoryId}
               onChange={(event) => setSelectedCategoryId(event.target.value)}
               className="h-11 border-b border-zinc-200/80 bg-transparent px-0 text-sm text-zinc-700 outline-none transition focus:border-primary/50 dark:border-zinc-800/80 dark:text-zinc-200"
             >
-              <option value="">未分类</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </label>
+                <option value="">未分类</option>
+                {categoryItems.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <fieldset className="grid gap-4 border-t border-zinc-200/80 pt-5 dark:border-zinc-800/80">
-            <legend className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
-              标签
-            </legend>
-            {tags.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <label
-                    key={tag.id}
-                    className={`inline-flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-medium transition ${
-                      selectedTagIds.has(tag.id)
-                        ? "bg-primary text-white dark:bg-sky-300 dark:text-zinc-950"
-                        : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      name="tagIds"
-                      value={tag.id}
-                      defaultChecked={selectedTagIds.has(tag.id)}
-                      onChange={(event) => {
-                        setSelectedTagIds((current) => {
-                          const next = new Set(current);
-
-                          if (event.target.checked) {
-                            next.add(tag.id);
-                          } else {
-                            next.delete(tag.id);
-                          }
-
-                          return next;
-                        });
-                      }}
-                      className="sr-only"
-                    />
-                    <span>{tag.name}</span>
-                    <span
-                      aria-hidden="true"
-                      className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-[0.2rem] border ${
+            <fieldset className="grid gap-4 border-t border-zinc-200/80 pt-5 dark:border-zinc-800/80">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
+                  标签
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsTagDialogOpen(true)}
+                  className="text-xs font-medium text-zinc-500 transition hover:text-primary dark:text-zinc-400 dark:hover:text-sky-300"
+                >
+                  创建标签
+                </button>
+              </div>
+              {tagItems.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {tagItems.map((tag) => (
+                    <label
+                      key={tag.id}
+                      className={`inline-flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-medium transition ${
                         selectedTagIds.has(tag.id)
-                          ? "border-current/40 bg-white/15 dark:bg-zinc-950/15"
-                          : "border-current/30"
+                          ? "bg-primary text-white dark:bg-sky-300 dark:text-zinc-950"
+                          : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                       }`}
                     >
-                      {selectedTagIds.has(tag.id) ? <Check className="h-3 w-3" /> : null}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">还没有可用标签。</p>
-            )}
-          </fieldset>
-        </>
-      }
-      footerLeft={
-        <>
-          <p className="min-w-0 text-xs text-zinc-500 dark:text-zinc-400">{bottomPrompt}</p>
-          {hasSavedRevision ? <DiscardRevisionButton postId={post?.id ?? 0} /> : null}
-        </>
-      }
-      footerRight={
-        <>
-          <SaveButton hasExistingPost={Boolean(post)} />
-          <PublishButton hasExistingPost={Boolean(post)} />
-        </>
-      }
-    />
+                      <input
+                        type="checkbox"
+                        name="tagIds"
+                        value={tag.id}
+                        checked={selectedTagIds.has(tag.id)}
+                        onChange={(event) => {
+                          setSelectedTagIds((current) => {
+                            const next = new Set(current);
+
+                            if (event.target.checked) {
+                              next.add(tag.id);
+                            } else {
+                              next.delete(tag.id);
+                            }
+
+                            return next;
+                          });
+                        }}
+                        className="sr-only"
+                      />
+                      <span>{tag.name}</span>
+                      <span
+                        aria-hidden="true"
+                        className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-[0.2rem] border ${
+                          selectedTagIds.has(tag.id)
+                            ? "border-current/40 bg-white/15 dark:bg-zinc-950/15"
+                            : "border-current/30"
+                        }`}
+                      >
+                        {selectedTagIds.has(tag.id) ? <Check className="h-3 w-3" /> : null}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">还没有可用标签。</p>
+              )}
+            </fieldset>
+          </>
+        }
+        footerLeft={
+          <>
+            <p className="min-w-0 text-xs text-zinc-500 dark:text-zinc-400">{bottomPrompt}</p>
+            {hasSavedRevision ? <DiscardRevisionButton postId={post?.id ?? 0} /> : null}
+          </>
+        }
+        footerRight={
+          <>
+            <PreviewButton
+              onClick={() =>
+                setPreviewState(buildPostPreviewState(formRef.current, categoryItems, tagItems, authorName))
+              }
+            />
+            <SaveButton hasExistingPost={Boolean(post)} />
+            <PublishButton hasExistingPost={Boolean(post)} />
+          </>
+        }
+      />
+      <InlineCreateCategoryDialog
+        open={isCategoryDialogOpen}
+        onOpenChange={setIsCategoryDialogOpen}
+        onCreated={(category) => {
+          setCategoryItems((current) =>
+            sortCategories(
+              dedupeById([...current.filter((item) => item.id !== category.id), category]),
+            ),
+          );
+          setSelectedCategoryId(String(category.id));
+        }}
+        onCreatedRef={handleCreatedCategoryRef}
+      />
+      <InlineCreateTagDialog
+        open={isTagDialogOpen}
+        onOpenChange={setIsTagDialogOpen}
+        onCreated={(tag) => {
+          setTagItems((current) => sortTags(dedupeById([...current.filter((item) => item.id !== tag.id), tag])));
+          setSelectedTagIds((current) => {
+            const next = new Set(current);
+            next.add(tag.id);
+            return next;
+          });
+        }}
+        onCreatedRef={handleCreatedTagRef}
+      />
+      <ContentPreviewDialog
+        open={Boolean(previewState)}
+      title={previewState?.title ?? "预览"}
+      subtitle={previewState?.subtitle}
+      meta={previewState?.meta ? <span>{previewState.meta}</span> : null}
+        body={
+          <div
+            className="reading-copy space-y-4 text-base leading-8 text-zinc-700 dark:text-zinc-300"
+            dangerouslySetInnerHTML={{ __html: previewState?.body ?? "" }}
+          />
+        }
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewState(null);
+          }
+        }}
+      />
+    </>
   );
 }
 
@@ -254,6 +344,83 @@ function getDraftSavedAt(post: PostItem | null) {
   return post.draftSnapshot.savedAt ?? null;
 }
 
+function buildPostPreviewState(
+  form: HTMLFormElement | null,
+  categories: CategoryOption[],
+  tags: TagOption[],
+  authorName: string,
+): PostPreviewState | null {
+  if (!form) {
+    return null;
+  }
+
+  const formData = new FormData(form);
+  const title = getFormValue(formData, "title") || "未命名文章";
+  const summary = getFormValue(formData, "summary");
+  const content = getFormValue(formData, "content");
+  const categoryId = getFormValue(formData, "categoryId");
+  const selectedTagIds = new Set(
+    formData
+      .getAll("tagIds")
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
+  const category = categories.find((item) => String(item.id) === categoryId);
+  const selectedTags = tags.filter((tag) => selectedTagIds.has(tag.id));
+  const publishedAt = getFormValue(formData, "publishedAt");
+  const categoryLabel = category?.name ? escapeHtmlText(category.name) : "未分类";
+  const tagLabels =
+    selectedTags.length > 0
+      ? selectedTags.map((tag) => `<span class="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">#${escapeHtmlText(tag.name)}</span>`).join("")
+      : "";
+  const contentHtml = renderPlainTextContentHtml(content) ?? "<p>暂无内容。</p>";
+  const formattedPublishedAt = publishedAt ? formatAdminDateTime(publishedAt) : null;
+
+  return {
+    title,
+    subtitle: summary || null,
+    meta: [
+      authorName,
+      formattedPublishedAt ? `发布时间：${formattedPublishedAt}` : "未设置发布时间",
+      category ? `分类：${category.name}` : "未分类",
+    ].join(" · "),
+    body: `
+      <article class="mx-auto max-w-3xl">
+        <div class="mt-5 flex flex-wrap gap-2">
+          <span class="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary dark:bg-sky-400/10 dark:text-sky-300">${categoryLabel}</span>
+          ${tagLabels}
+        </div>
+        <div class="reading-copy mt-10 space-y-6 text-base leading-8 text-zinc-800 dark:text-zinc-200">
+          ${contentHtml}
+        </div>
+      </article>
+    `,
+  };
+}
+
+function getFormValue(formData: FormData, key: string) {
+  const value = formData.get(key);
+
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.trim();
+}
+
+function PreviewButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-10 items-center justify-center px-1 text-sm font-medium text-zinc-500 transition hover:text-primary dark:text-zinc-400 dark:hover:text-sky-300"
+    >
+      预览
+    </button>
+  );
+}
+
 function SaveButton({ hasExistingPost }: { hasExistingPost: boolean }) {
   const { pending } = useFormStatus();
 
@@ -297,4 +464,285 @@ function DiscardRevisionButton({ postId }: { postId: number }) {
       confirmTone="danger"
     />
   );
+}
+
+function InlineCreateCategoryDialog({
+  open,
+  onOpenChange,
+  onCreated,
+  onCreatedRef,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (category: CategoryOption) => void;
+  onCreatedRef: React.MutableRefObject<(category: CategoryOption) => void>;
+}) {
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const [state, formAction] = useActionState(createCategoryAction, {
+    error: null,
+    redirectTo: null,
+    createdCategory: null,
+  });
+
+  useEffect(() => {
+    onCreatedRef.current = onCreated;
+  }, [onCreated, onCreatedRef]);
+
+  useEffect(() => {
+    if (!state.createdCategory) {
+      return;
+    }
+
+    onCreatedRef.current(state.createdCategory);
+    onOpenChange(false);
+    formRef.current?.reset();
+  }, [onCreatedRef, onOpenChange, state.createdCategory]);
+
+  if (!open || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[90] bg-zinc-950/35 backdrop-blur-[2px] dark:bg-black/50"
+      onClick={() => onOpenChange(false)}
+    >
+      <div className="flex min-h-full items-center justify-center px-4 py-16">
+        <form
+          ref={formRef}
+          action={formAction}
+          onClick={(event) => event.stopPropagation()}
+          className="w-full max-w-lg rounded-[1.75rem] border border-zinc-200/80 bg-white p-6 shadow-[0_30px_120px_rgba(15,23,42,0.16)] dark:border-zinc-800/80 dark:bg-zinc-950"
+        >
+          <input type="hidden" name="inlineCreate" value="1" />
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.24em] text-zinc-400 dark:text-zinc-500">
+                分类
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                创建分类
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-500 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
+              aria-label="关闭创建分类弹窗"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="mt-6 grid gap-4">
+            <label className="grid gap-2">
+              <span className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
+                名称
+              </span>
+              <input
+                name="name"
+                type="text"
+                required
+                placeholder="输入分类名称"
+                className="h-12 rounded-2xl border border-zinc-200/80 bg-transparent px-4 text-base text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-primary/50 dark:border-zinc-800/80 dark:text-zinc-50 dark:placeholder:text-zinc-600"
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
+                Slug
+              </span>
+              <input
+                name="slug"
+                type="text"
+                required
+                placeholder="例如: product-notes"
+                className="h-12 rounded-2xl border border-zinc-200/80 bg-transparent px-4 text-base text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-primary/50 dark:border-zinc-800/80 dark:text-zinc-50 dark:placeholder:text-zinc-600"
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
+                描述
+              </span>
+              <textarea
+                name="description"
+                rows={4}
+                placeholder="为这个分类写一段简介"
+                className="min-h-28 rounded-[1.25rem] border border-zinc-200/80 bg-transparent px-4 py-3 text-base leading-7 text-zinc-700 outline-none transition placeholder:text-zinc-400 focus:border-primary/50 dark:border-zinc-800/80 dark:text-zinc-200 dark:placeholder:text-zinc-600"
+              />
+            </label>
+
+            {state.error ? (
+              <p className="text-sm text-rose-600 dark:text-rose-300">{state.error}</p>
+            ) : null}
+          </div>
+
+          <div className="mt-6 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="inline-flex items-center justify-center rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
+            >
+              取消
+            </button>
+            <InlineCreateSubmitButton label="创建分类" />
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function InlineCreateTagDialog({
+  open,
+  onOpenChange,
+  onCreated,
+  onCreatedRef,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (tag: TagOption) => void;
+  onCreatedRef: React.MutableRefObject<(tag: TagOption) => void>;
+}) {
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const [state, formAction] = useActionState(createTagAction, {
+    error: null,
+    redirectTo: null,
+    createdTag: null,
+  });
+
+  useEffect(() => {
+    onCreatedRef.current = onCreated;
+  }, [onCreated, onCreatedRef]);
+
+  useEffect(() => {
+    if (!state.createdTag) {
+      return;
+    }
+
+    onCreatedRef.current(state.createdTag);
+    onOpenChange(false);
+    formRef.current?.reset();
+  }, [onCreatedRef, onOpenChange, state.createdTag]);
+
+  if (!open || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[90] bg-zinc-950/35 backdrop-blur-[2px] dark:bg-black/50"
+      onClick={() => onOpenChange(false)}
+    >
+      <div className="flex min-h-full items-center justify-center px-4 py-16">
+        <form
+          ref={formRef}
+          action={formAction}
+          onClick={(event) => event.stopPropagation()}
+          className="w-full max-w-lg rounded-[1.75rem] border border-zinc-200/80 bg-white p-6 shadow-[0_30px_120px_rgba(15,23,42,0.16)] dark:border-zinc-800/80 dark:bg-zinc-950"
+        >
+          <input type="hidden" name="inlineCreate" value="1" />
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.24em] text-zinc-400 dark:text-zinc-500">
+                标签
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                创建标签
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-500 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
+              aria-label="关闭创建标签弹窗"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="mt-6 grid gap-4">
+            <label className="grid gap-2">
+              <span className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
+                名称
+              </span>
+              <input
+                name="name"
+                type="text"
+                required
+                placeholder="输入标签名称"
+                className="h-12 rounded-2xl border border-zinc-200/80 bg-transparent px-4 text-base text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-primary/50 dark:border-zinc-800/80 dark:text-zinc-50 dark:placeholder:text-zinc-600"
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
+                Slug
+              </span>
+              <input
+                name="slug"
+                type="text"
+                required
+                placeholder="例如: release-notes"
+                className="h-12 rounded-2xl border border-zinc-200/80 bg-transparent px-4 text-base text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-primary/50 dark:border-zinc-800/80 dark:text-zinc-50 dark:placeholder:text-zinc-600"
+              />
+            </label>
+
+            {state.error ? (
+              <p className="text-sm text-rose-600 dark:text-rose-300">{state.error}</p>
+            ) : null}
+          </div>
+
+          <div className="mt-6 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="inline-flex items-center justify-center rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
+            >
+              取消
+            </button>
+            <InlineCreateSubmitButton label="创建标签" />
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function InlineCreateSubmitButton({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="inline-flex items-center justify-center rounded-2xl border border-transparent bg-zinc-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+    >
+      {pending ? "创建中..." : label}
+    </button>
+  );
+}
+
+function sortCategories(categories: CategoryOption[]) {
+  return [...categories].sort((left, right) => left.name.localeCompare(right.name, "zh-Hans-CN"));
+}
+
+function sortTags(tags: TagOption[]) {
+  return [...tags].sort((left, right) => left.name.localeCompare(right.name, "zh-Hans-CN"));
+}
+
+function dedupeById<T extends { id: string | number }>(items: T[]) {
+  const seen = new Set<string | number>();
+
+  return items.filter((item) => {
+    if (seen.has(item.id)) {
+      return false;
+    }
+
+    seen.add(item.id);
+    return true;
+  });
 }

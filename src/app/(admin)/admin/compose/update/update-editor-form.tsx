@@ -1,7 +1,7 @@
 "use client";
 
 import { ContentStatus } from "@prisma/client";
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import {
@@ -10,9 +10,11 @@ import {
   type SaveUpdateEditorState,
 } from "@/app/(admin)/admin/compose/update/actions";
 import { ContentEditorShell } from "@/app/(admin)/admin/compose/content-editor-shell";
+import { ContentPreviewDialog } from "@/app/(admin)/admin/compose/content-preview-dialog";
 import { ConfirmActionDialog } from "@/app/(admin)/admin/confirm-action-dialog";
 import { PublishedAtField } from "@/app/(admin)/admin/compose/post/published-at-field";
 import { formatAdminDateTime } from "@/app/(admin)/admin/utils";
+import { renderPlainTextContentHtml } from "@/lib/content";
 import type { UpdateItem } from "@/server/repositories/updates";
 
 const initialState: SaveUpdateEditorState = {
@@ -22,12 +24,22 @@ const initialState: SaveUpdateEditorState = {
 
 type UpdateEditorFormProps = {
   update: UpdateItem | null;
+  authorName: string;
 };
 
-export function UpdateEditorForm({ update }: UpdateEditorFormProps) {
+type UpdatePreviewState = {
+  title: string;
+  subtitle: string | null;
+  meta: string;
+  body: string;
+};
+
+export function UpdateEditorForm({ update, authorName }: UpdateEditorFormProps) {
   const router = useRouter();
   const [state, formAction] = useActionState(saveUpdateAction, initialState);
   const editableUpdate = getEditableUpdate(update);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const [previewState, setPreviewState] = useState<UpdatePreviewState | null>(null);
   const draftSavedAt = getDraftSavedAt(update);
   const hasSavedRevision = Boolean(update?.status === ContentStatus.PUBLISHED && draftSavedAt);
   const bottomPrompt = getBottomPrompt(update, draftSavedAt);
@@ -41,55 +53,78 @@ export function UpdateEditorForm({ update }: UpdateEditorFormProps) {
   }, [router, state.redirectTo]);
 
   return (
-    <ContentEditorShell
-      formAction={formAction}
-      hiddenFields={
-        <>
-          <input type="hidden" name="updateId" value={update?.id ?? ""} />
-          <input type="hidden" name="currentStatus" value={status} />
-        </>
-      }
-      stateError={state.error}
-      main={
-        <>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            动态只需要填写内容，标题会自动从内容生成。
-          </p>
+    <>
+      <ContentEditorShell
+        formRef={formRef}
+        formAction={formAction}
+        hiddenFields={
+          <>
+            <input type="hidden" name="updateId" value={update?.id ?? ""} />
+            <input type="hidden" name="currentStatus" value={status} />
+          </>
+        }
+        stateError={state.error}
+        main={
+          <>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              动态只需要填写内容，标题会自动从内容生成。
+            </p>
 
-          <label className="grid gap-2">
-            <textarea
-              name="content"
-              rows={16}
-              defaultValue={contentValue}
-              placeholder="先用纯文本写动态内容。保存时会按段落自动生成基础 HTML。"
-              className="min-h-[22rem] border-none bg-transparent px-0 py-1 text-lg leading-9 text-zinc-800 outline-none transition placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
-            />
-          </label>
-        </>
-      }
-      sidebar={
-        <>
-          <label className="grid gap-2 border-t border-zinc-200/80 pt-5 dark:border-zinc-800/80">
-            <span className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
-              发布日期
-            </span>
-            <PublishedAtField defaultValue={editableUpdate?.publishedAt} />
-          </label>
-        </>
-      }
-      footerLeft={
-        <>
-          <p className="min-w-0 text-xs text-zinc-500 dark:text-zinc-400">{bottomPrompt}</p>
-          {hasSavedRevision ? <DiscardRevisionButton updateId={update?.id ?? 0} /> : null}
-        </>
-      }
-      footerRight={
-        <>
-          <SaveButton />
-          <PublishButton isPublished={status === ContentStatus.PUBLISHED} />
-        </>
-      }
-    />
+            <label className="grid gap-2">
+              <textarea
+                name="content"
+                rows={16}
+                defaultValue={contentValue}
+                placeholder="先用纯文本写动态内容。保存时会按段落自动生成基础 HTML。"
+                className="min-h-[22rem] border-none bg-transparent px-0 py-1 text-lg leading-9 text-zinc-800 outline-none transition placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
+              />
+            </label>
+          </>
+        }
+        sidebar={
+          <>
+            <label className="grid gap-2 border-t border-zinc-200/80 pt-5 dark:border-zinc-800/80">
+              <span className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
+                发布日期
+              </span>
+              <PublishedAtField defaultValue={editableUpdate?.publishedAt} />
+            </label>
+          </>
+        }
+        footerLeft={
+          <>
+            <p className="min-w-0 text-xs text-zinc-500 dark:text-zinc-400">{bottomPrompt}</p>
+            {hasSavedRevision ? <DiscardRevisionButton updateId={update?.id ?? 0} /> : null}
+          </>
+        }
+        footerRight={
+          <>
+          <PreviewButton
+            onClick={() => setPreviewState(buildUpdatePreviewState(formRef.current, authorName))}
+          />
+            <SaveButton />
+            <PublishButton isPublished={status === ContentStatus.PUBLISHED} />
+          </>
+        }
+      />
+      <ContentPreviewDialog
+        open={Boolean(previewState)}
+        title={previewState?.title ?? "预览"}
+        subtitle={previewState?.subtitle}
+        meta={previewState?.meta ? <span>{previewState.meta}</span> : null}
+        body={
+          <div
+            className="reading-copy space-y-4 text-base leading-8 text-zinc-700 dark:text-zinc-300"
+            dangerouslySetInnerHTML={{ __html: previewState?.body ?? "" }}
+          />
+        }
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewState(null);
+          }
+        }}
+      />
+    </>
   );
 }
 
@@ -129,6 +164,51 @@ function getDraftSavedAt(update: UpdateItem | null) {
   }
 
   return update.draftSnapshot.savedAt ?? null;
+}
+
+function buildUpdatePreviewState(form: HTMLFormElement | null, authorName: string): UpdatePreviewState | null {
+  if (!form) {
+    return null;
+  }
+
+  const formData = new FormData(form);
+  const content = getFormValue(formData, "content");
+  const publishedAt = getFormValue(formData, "publishedAt");
+  const title = getPreviewTitle(content);
+  const body = renderPlainTextContentHtml(content) ?? "<p>暂无内容。</p>";
+  const formattedPublishedAt = publishedAt ? formatAdminDateTime(publishedAt) : null;
+
+  return {
+    title,
+    subtitle: "足迹预览",
+    meta: [authorName, formattedPublishedAt ? `发布时间：${formattedPublishedAt}` : "未设置发布时间"].join(
+      " · ",
+    ),
+    body: `
+      <div class="reading-copy space-y-6 text-base leading-8 text-zinc-800 dark:text-zinc-200">
+        ${body}
+      </div>
+    `,
+  };
+}
+
+function getPreviewTitle(content: string) {
+  const firstLine = content
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .find(Boolean);
+
+  return firstLine ? firstLine.slice(0, 32) : "未命名动态";
+}
+
+function getFormValue(formData: FormData, key: string) {
+  const value = formData.get(key);
+
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.trim();
 }
 
 function SaveButton() {
@@ -175,5 +255,17 @@ function DiscardRevisionButton({ updateId }: { updateId: number }) {
       fields={[{ name: "updateId", value: updateId }]}
       confirmTone="danger"
     />
+  );
+}
+
+function PreviewButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-10 items-center justify-center px-1 text-sm font-medium text-zinc-500 transition hover:text-primary dark:text-zinc-400 dark:hover:text-sky-300"
+    >
+      预览
+    </button>
   );
 }

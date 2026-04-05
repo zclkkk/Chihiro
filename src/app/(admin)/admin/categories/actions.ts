@@ -13,6 +13,7 @@ import { requireAdminSession } from "@/server/auth";
 export type SaveCategoryEditorState = {
   error: string | null;
   redirectTo: string | null;
+  createdCategory: Awaited<ReturnType<typeof createCategory>> | null;
 };
 
 export async function saveCategoryAction(
@@ -39,18 +40,21 @@ export async function saveCategoryAction(
       return {
         error: "这个 slug 已经被占用了，请换一个。",
         redirectTo: null,
+        createdCategory: null,
       };
     }
 
     return {
       error: error instanceof Error ? error.message : "保存分类时出错了。",
       redirectTo: null,
+      createdCategory: null,
     };
   }
 
   return {
     error: null,
     redirectTo: "/admin/workbench?tab=categories",
+    createdCategory: null,
   };
 }
 
@@ -62,6 +66,7 @@ export async function createCategoryAction(
   const name = getRequiredString(formData, "name");
   const slug = normalizeSlug(getRequiredString(formData, "slug"));
   const description = getOptionalString(formData, "description");
+  const inlineCreate = getOptionalString(formData, "inlineCreate") === "1";
 
   try {
     const category = await createCategory({
@@ -71,23 +76,34 @@ export async function createCategoryAction(
     });
 
     revalidateCategorySurfaces(category.id, category.slug);
+
+    if (inlineCreate) {
+      return {
+        error: null,
+        redirectTo: null,
+        createdCategory: category,
+      };
+    }
   } catch (error) {
     if (isUniqueSlugError(error)) {
       return {
         error: "这个 slug 已经被占用了，请换一个。",
         redirectTo: null,
+        createdCategory: null,
       };
     }
 
     return {
       error: error instanceof Error ? error.message : "创建分类时出错了。",
       redirectTo: null,
+      createdCategory: null,
     };
   }
 
   return {
     error: null,
     redirectTo: "/admin/workbench?tab=categories",
+    createdCategory: null,
   };
 }
 

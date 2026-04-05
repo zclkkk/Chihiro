@@ -1,9 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 
 type ContentEditorShellProps = {
   formAction: (formData: FormData) => void;
+  formRef?: RefObject<HTMLFormElement | null>;
   hiddenFields: ReactNode;
   main: ReactNode;
   sidebar: ReactNode;
@@ -14,6 +15,7 @@ type ContentEditorShellProps = {
 
 export function ContentEditorShell({
   formAction,
+  formRef,
   hiddenFields,
   main,
   sidebar,
@@ -22,7 +24,7 @@ export function ContentEditorShell({
   footerRight,
 }: ContentEditorShellProps) {
   return (
-    <form action={formAction} className="grid gap-6">
+    <form ref={formRef} action={formAction} className="grid gap-6">
       {hiddenFields}
 
       <section className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-14">

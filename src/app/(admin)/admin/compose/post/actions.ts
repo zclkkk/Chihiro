@@ -3,6 +3,7 @@
 import { ContentStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { renderPlainTextContentHtml } from "@/lib/content";
 import { getPostPath } from "@/lib/routes";
 import { requireAdminSession } from "@/server/auth";
 import {
@@ -50,7 +51,7 @@ export async function savePostDraftAction(
       slug,
       summary,
       content,
-      contentHtml: renderContentHtml(content),
+      contentHtml: renderPlainTextContentHtml(content),
       status: currentStatus,
       categoryId,
       publishedAt,
@@ -220,34 +221,6 @@ function parsePublishedAtInput(value: string) {
   }
 
   return date;
-}
-
-function renderContentHtml(content: string | null) {
-  if (!content) {
-    return null;
-  }
-
-  const paragraphs = content
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
-
-  if (paragraphs.length === 0) {
-    return null;
-  }
-
-  return paragraphs
-    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br />")}</p>`)
-    .join("");
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 function isUniqueSlugError(error: unknown) {

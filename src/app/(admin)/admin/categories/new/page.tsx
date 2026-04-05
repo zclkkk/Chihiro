@@ -3,7 +3,7 @@ import { CategoryEditorForm } from "@/app/(admin)/admin/categories/[id]/category
 
 export default function AdminCategoryNewPage() {
   return (
-    <div className="grid gap-8">
+    <div className="mx-auto grid w-full max-w-3xl gap-8">
       <AdminPageHeader eyebrow="Category" title="添加分类" />
       <CategoryEditorForm />
     </div>

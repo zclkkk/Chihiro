@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatContentTerm, getContentText } from "@/lib/content";
+import { formatContentTerm, getContentPreview, getContentText } from "@/lib/content";
 import { getPostPath } from "@/lib/routes";
 import { SearchDialog } from "@/components/search-dialog";
 import { PostTagsPanel } from "@/components/post-tags-panel";
@@ -428,8 +428,4 @@ function getCategoryFilterLabel(slug: string, posts: PublishedPost[]) {
 
 function getTagFilterLabel(slug: string, posts: PublishedPost[]) {
   return posts.flatMap((post) => post.tags).find((tag) => tag.slug === slug)?.name ?? formatContentTerm(slug);
-}
-
-function getContentPreview(contentHtml: string | null, content: unknown) {
-  return getContentText(contentHtml, content) || "No preview available yet.";
 }

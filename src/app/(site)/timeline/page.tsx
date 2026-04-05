@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getContentText } from "@/lib/content";
+import { getContentPreview, getContentText } from "@/lib/content";
 import { getPostPath, getTimelinePath, getUpdateAnchorPath } from "@/lib/routes";
 import { ArchiveTimeline, type ArchiveYearGroup } from "@/components/archive-timeline";
 import { SearchDialog } from "@/components/search-dialog";
@@ -137,7 +137,7 @@ function getTimelineItems(
     categoryLabel: post.category?.name ?? "Uncategorized",
     kindLabel: "Posts",
     meta: post.authorName ?? undefined,
-    summary: post.summary ?? "",
+    summary: post.summary ?? getContentPreview(post.contentHtml, post.content),
     searchText: [
       post.title,
       post.summary ?? "",
@@ -160,7 +160,7 @@ function getTimelineItems(
     kindLabel: "Updates",
     meta: update.authorName ?? undefined,
     authorName: update.authorName,
-    summary: getContentText(update.contentHtml, update.content),
+    summary: getContentPreview(update.contentHtml, update.content),
     searchText: [
       update.title,
       "Updates",

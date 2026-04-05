@@ -18,7 +18,7 @@ export default async function AdminTagPage({ params }: AdminTagPageProps) {
   }
 
   return (
-    <div className="grid gap-8">
+    <div className="mx-auto grid w-full max-w-3xl gap-8">
       <AdminPageHeader eyebrow="Tag" title="编辑标签" />
       <TagEditorForm tag={tag} />
     </div>

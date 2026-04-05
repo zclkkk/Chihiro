@@ -24,7 +24,7 @@ export default async function AdminCategoryPage({ params }: AdminCategoryPagePro
   }
 
   return (
-    <div className="grid gap-8">
+    <div className="mx-auto grid w-full max-w-3xl gap-8">
       <AdminPageHeader eyebrow="Category" title="编辑分类" />
       <CategoryEditorForm category={category} />
     </div>

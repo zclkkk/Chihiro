@@ -10,10 +10,12 @@ import {
   updateTagById,
 } from "@/server/repositories/tags";
 import { requireAdminSession } from "@/server/auth";
+import type { TagItem } from "@/server/repositories/tags";
 
 export type SaveTagEditorState = {
   error: string | null;
   redirectTo: string | null;
+  createdTag: TagItem | null;
 };
 
 export async function createTagAction(
@@ -23,6 +25,7 @@ export async function createTagAction(
   await requireAdminSession();
   const name = getRequiredString(formData, "name");
   const slug = normalizeSlug(getRequiredString(formData, "slug"));
+  const inlineCreate = getOptionalString(formData, "inlineCreate") === "1";
 
   try {
     const tag = await createTag({
@@ -31,23 +34,34 @@ export async function createTagAction(
     });
 
     revalidateTagSurfaces(tag.id, tag.slug);
+
+    if (inlineCreate) {
+      return {
+        error: null,
+        redirectTo: null,
+        createdTag: tag,
+      };
+    }
   } catch (error) {
     if (isUniqueSlugError(error)) {
       return {
         error: "这个 slug 已经被占用了，请换一个。",
         redirectTo: null,
+        createdTag: null,
       };
     }
 
     return {
       error: error instanceof Error ? error.message : "创建标签时出错了。",
       redirectTo: null,
+      createdTag: null,
     };
   }
 
   return {
     error: null,
     redirectTo: "/admin/workbench?tab=tags",
+    createdTag: null,
   };
 }
 
@@ -66,6 +80,7 @@ export async function saveTagAction(
       return {
         error: "标签不存在。",
         redirectTo: null,
+        createdTag: null,
       };
     }
 
@@ -82,18 +97,21 @@ export async function saveTagAction(
       return {
         error: "这个 slug 已经被占用了，请换一个。",
         redirectTo: null,
+        createdTag: null,
       };
     }
 
     return {
       error: error instanceof Error ? error.message : "保存标签时出错了。",
       redirectTo: null,
+      createdTag: null,
     };
   }
 
   return {
     error: null,
     redirectTo: "/admin/workbench?tab=tags",
+    createdTag: null,
   };
 }
 
@@ -134,6 +152,17 @@ function getRequiredString(formData: FormData, key: string) {
   }
 
   return value.trim();
+}
+
+function getOptionalString(formData: FormData, key: string) {
+  const value = formData.get(key);
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized ? normalized : null;
 }
 
 function normalizeSlug(value: string) {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getContentText } from "@/lib/content";
+import { getContentPreview, getContentText } from "@/lib/content";
 import { getUpdateAnchorPath } from "@/lib/routes";
 import { SearchDialog } from "@/components/search-dialog";
 import { listAllPublishedUpdates } from "@/server/repositories/updates";
@@ -362,8 +362,4 @@ function getVisiblePageItems(currentPage: number, totalPages: number) {
     "ellipsis",
     totalPages,
   ] as const;
-}
-
-function getContentPreview(contentHtml: string | null, content: unknown) {
-  return getContentText(contentHtml, content) || "No preview available yet.";
 }
