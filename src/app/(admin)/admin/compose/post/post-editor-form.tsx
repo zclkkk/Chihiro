@@ -403,7 +403,7 @@ function PreviewButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-10 items-center justify-center px-1 text-sm font-medium text-zinc-500 transition hover:text-primary dark:text-zinc-400 dark:hover:text-sky-300"
+      className="inline-flex h-10 w-full items-center justify-center px-1 text-sm font-medium text-zinc-500 transition hover:text-primary dark:text-zinc-400 dark:hover:text-sky-300 sm:w-auto"
     >
       预览
     </button>
@@ -417,7 +417,7 @@ function SaveButton({ hasExistingPost }: { hasExistingPost: boolean }) {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex h-10 items-center justify-center px-1 text-sm font-medium text-primary transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex h-10 w-full items-center justify-center px-1 text-sm font-medium text-primary transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
     >
       {pending ? "保存中..." : hasExistingPost ? "保存草稿" : "创建草稿"}
     </button>
@@ -433,7 +433,7 @@ function PublishButton({ hasExistingPost }: { hasExistingPost: boolean }) {
       name="intent"
       value="publish"
       disabled={pending}
-      className="inline-flex items-center justify-center border border-transparent bg-zinc-950 px-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+      className="inline-flex h-10 w-full items-center justify-center px-1 text-[0.98rem] font-semibold text-primary underline decoration-1 underline-offset-4 transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60 dark:text-sky-300 sm:w-auto"
     >
       {pending ? "发布中..." : hasExistingPost ? "更新并发布" : "发布文章"}
     </button>
@@ -444,7 +444,7 @@ function DiscardRevisionButton({ postId }: { postId: number }) {
   return (
     <ConfirmActionDialog
       triggerLabel="删除修订"
-      triggerClassName="inline-flex h-8 items-center justify-center rounded-full border border-transparent px-2.5 text-xs font-medium text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300 dark:hover:bg-rose-500/10"
+      triggerClassName="inline-flex h-8 w-full items-center justify-center rounded-full border border-transparent px-2.5 text-xs font-medium text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300 dark:hover:bg-rose-500/10 sm:w-auto"
       title="删除这份修订？"
       description="删除后会恢复到上一次已发布的版本，当前保存的草稿内容会被丢弃。"
       confirmLabel="删除修订"

@@ -88,11 +88,12 @@ export function PostRichTextEditor({ initialValue }: PostRichTextEditorProps) {
     () => withCustomElements(withHistory(withReact(createEditor())) as Editor) as Editor,
   )[0];
   const [value, setValue] = useState<Descendant[]>(() => initialValue);
+  const isEditorEmpty = isEmptySlateDocument(value);
   const [insertDialog, setInsertDialog] = useState<InsertDialogState>(null);
   const insertDialogSeq = useRef(0);
 
   return (
-    <section className="grid gap-0">
+    <section className="flex min-h-[18rem] flex-col gap-0">
       <input type="hidden" name="content" value={JSON.stringify(serializeSlateContent(value))} />
       <input type="hidden" name="contentHtml" value={renderSlateContentHtml(value)} />
       <Slate editor={editor} initialValue={initialValue} onChange={setValue}>
@@ -115,13 +116,22 @@ export function PostRichTextEditor({ initialValue }: PostRichTextEditorProps) {
               alt: "",
             })
           }
-      />
+        />
         <Editable
-          className="min-h-[32rem] px-0 py-2 text-[1.05rem] leading-9 text-zinc-800 outline-none transition dark:text-zinc-200"
+          className="block min-h-[18rem] max-h-[calc(100dvh-24rem)] w-full cursor-text overflow-y-auto px-0 py-2 text-[1.05rem] leading-9 text-zinc-800 outline-none transition dark:text-zinc-200"
           placeholder="开始写你的正文。可以用工具栏插入标题、引用、链接和图片。"
-          renderElement={renderElement}
+          renderElement={(props) => renderElement(props, isEditorEmpty)}
           renderLeaf={renderLeaf}
           spellCheck
+          onMouseDown={(event) => {
+            if (event.target !== event.currentTarget) {
+              return;
+            }
+
+            event.preventDefault();
+            ReactEditor.focus(editor);
+            Transforms.select(editor, Editor.end(editor, []));
+          }}
           onKeyDown={(event) => {
             if (event.key === "ArrowLeft") {
               if (skipLinkOnArrow(editor, "backward")) {
@@ -192,7 +202,7 @@ function Toolbar({
   onOpenImageDialog: () => void;
 }) {
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-0 text-sm text-zinc-500 dark:text-zinc-400">
+    <div className="sticky top-0 z-20 flex flex-wrap items-center gap-0 bg-[color:var(--background)]/95 py-3 text-sm text-zinc-500 backdrop-blur-md supports-[backdrop-filter]:bg-[color:var(--background)]/85 dark:text-zinc-400">
       <ToolbarHeadingDropdown />
       <ToolbarMarkButton format="bold" label="粗体" icon={<Bold className="h-4 w-4" />} />
       <ToolbarMarkButton format="italic" label="斜体" icon={<Italic className="h-4 w-4" />} />
@@ -571,7 +581,7 @@ function InsertResourceDialog({
   );
 }
 
-function renderElement({ attributes, children, element }: RenderElementProps) {
+function renderElement({ attributes, children, element }: RenderElementProps, isEditorEmpty: boolean) {
   switch (element.type) {
     case "link":
       return (
@@ -645,7 +655,14 @@ function renderElement({ attributes, children, element }: RenderElementProps) {
         </figure>
       );
     default:
-      return <p {...attributes}>{children}</p>;
+      return (
+        <p
+          {...attributes}
+          className={`cursor-text ${isEditorEmpty ? "min-h-[18rem]" : ""}`}
+        >
+          {children}
+        </p>
+      );
   }
 }
 
@@ -682,6 +699,25 @@ function withCustomElements(editor: Editor) {
   };
 
   return editor;
+}
+
+function isEmptySlateDocument(value: Descendant[]) {
+  if (value.length !== 1) {
+    return false;
+  }
+
+  const [node] = value;
+
+  if (!SlateElement.isElement(node) || node.type !== "paragraph") {
+    return false;
+  }
+
+  if (node.children.length !== 1) {
+    return false;
+  }
+
+  const [child] = node.children;
+  return Text.isText(child) && child.text.length === 0;
 }
 
 function isMarkActive(editor: Editor, format: MarkFormat) {

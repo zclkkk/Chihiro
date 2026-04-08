@@ -3,7 +3,7 @@
 import { ContentStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { renderPlainTextContentHtml } from "@/lib/content";
+import { renderSlateContentHtml, createSlateContentValue } from "@/lib/slate-content";
 import { requireAdminSession } from "@/server/auth";
 import {
   discardUpdateRevisionById,
@@ -27,18 +27,18 @@ export async function saveUpdateAction(
   const intent = getOptionalString(formData, "intent") ?? "save";
   const currentStatus = getContentStatus(formData, "currentStatus");
 
-  const content = getOptionalString(formData, "content");
   const publishedAtInput = getOptionalString(formData, "publishedAt");
   const publishedAt = publishedAtInput ? parsePublishedAtInput(publishedAtInput) : null;
   const updateId = getOptionalUpdateId(formData, "updateId");
   const siteSettings = await getSiteSettings();
   const fallbackAuthorName = siteSettings?.authorName ?? siteConfig.author;
+  const content = parseSlateContent(formData);
 
   try {
     const update = await saveUpdate({
       id: updateId ?? undefined,
-      content,
-      contentHtml: renderPlainTextContentHtml(content),
+      content: content as unknown as Prisma.JsonValue,
+      contentHtml: renderSlateContentHtml(content),
       authorName: fallbackAuthorName,
       status: currentStatus,
       publishedAt,
@@ -144,6 +144,20 @@ function getContentStatus(formData: FormData, key: string): ContentStatus {
   const value = getOptionalString(formData, key);
 
   return value === ContentStatus.PUBLISHED ? ContentStatus.PUBLISHED : ContentStatus.DRAFT;
+}
+
+function parseSlateContent(formData: FormData) {
+  const raw = getOptionalString(formData, "content");
+
+  if (!raw) {
+    return createSlateContentValue(null);
+  }
+
+  try {
+    return createSlateContentValue(JSON.parse(raw));
+  } catch {
+    return createSlateContentValue(raw);
+  }
 }
 
 function parsePublishedAtInput(value: string) {

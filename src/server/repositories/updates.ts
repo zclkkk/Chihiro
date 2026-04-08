@@ -1,4 +1,5 @@
 import { ContentStatus, Prisma } from "@prisma/client";
+import { getParagraphsFromContent } from "@/lib/content";
 import { siteConfig } from "@/lib/site";
 import { prisma } from "@/server/db/client";
 
@@ -94,7 +95,7 @@ export async function listAllPublishedUpdates(
 
 export type SaveUpdateInput = {
   id?: number;
-  content: string | null;
+  content: Prisma.JsonValue | null;
   contentHtml: string | null;
   authorName: string | null;
   status: ContentStatus;
@@ -466,7 +467,7 @@ function parseDraftSnapshot(value: Prisma.JsonValue | null): DraftUpdateSnapshot
 
 function resolveUpdateTitle(
   currentTitle: string | null,
-  content: string | null,
+  content: Prisma.JsonValue | null,
 ) {
   const contentTitle = deriveTitleFromContent(content);
   if (contentTitle) {
@@ -480,13 +481,12 @@ function resolveUpdateTitle(
   return "未命名动态";
 }
 
-function deriveTitleFromContent(content: string | null) {
+function deriveTitleFromContent(content: Prisma.JsonValue | null) {
   if (!content) {
     return null;
   }
 
-  const firstLine = content
-    .split(/\n+/)
+  const firstLine = getParagraphsFromContent(content)
     .map((line) => line.trim())
     .find(Boolean);
 

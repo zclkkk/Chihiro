@@ -13,8 +13,10 @@ import { ContentEditorShell } from "@/app/(admin)/admin/compose/content-editor-s
 import { ContentPreviewDialog } from "@/app/(admin)/admin/compose/content-preview-dialog";
 import { ConfirmActionDialog } from "@/app/(admin)/admin/confirm-action-dialog";
 import { PublishedAtField } from "@/app/(admin)/admin/compose/post/published-at-field";
+import { PostRichTextEditor } from "@/app/(admin)/admin/compose/post/post-rich-text-editor";
 import { formatAdminDateTime } from "@/app/(admin)/admin/utils";
 import { getRenderedContentHtml } from "@/lib/content";
+import { createSlateContentValue, slateContentToText } from "@/lib/slate-content";
 import type { UpdateItem } from "@/server/repositories/updates";
 
 const initialState: SaveUpdateEditorState = {
@@ -43,7 +45,6 @@ export function UpdateEditorForm({ update, authorName }: UpdateEditorFormProps) 
   const draftSavedAt = getDraftSavedAt(update);
   const hasSavedRevision = Boolean(update?.status === ContentStatus.PUBLISHED && draftSavedAt);
   const bottomPrompt = getBottomPrompt(update, draftSavedAt);
-  const contentValue = typeof editableUpdate?.content === "string" ? editableUpdate.content : "";
   const status = update?.status ?? ContentStatus.DRAFT;
 
   useEffect(() => {
@@ -65,24 +66,13 @@ export function UpdateEditorForm({ update, authorName }: UpdateEditorFormProps) 
         }
         stateError={state.error}
         main={
-          <>
+          <div className="grid gap-4">
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
               动态只需要填写内容，标题会自动从内容生成。
             </p>
 
-            <label className="grid gap-2">
-              <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                支持直接粘贴图片外链，或使用 <code>![alt](url)</code>。
-              </p>
-              <textarea
-                name="content"
-                rows={16}
-                defaultValue={contentValue}
-                placeholder="先用纯文本写动态内容。保存时会按段落自动生成基础 HTML。"
-                className="min-h-[22rem] border-none bg-transparent px-0 py-1 text-lg leading-9 text-zinc-800 outline-none transition placeholder:text-zinc-400 focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-600"
-              />
-            </label>
-          </>
+            <PostRichTextEditor initialValue={createSlateContentValue(editableUpdate?.content)} />
+          </div>
         }
         sidebar={
           <>
@@ -175,7 +165,7 @@ function buildUpdatePreviewState(form: HTMLFormElement | null, authorName: strin
   }
 
   const formData = new FormData(form);
-  const content = getFormValue(formData, "content");
+  const content = parseSlateContent(formData);
   const publishedAt = getFormValue(formData, "publishedAt");
   const title = getPreviewTitle(content);
   const body = getRenderedContentHtml(null, content) ?? "<p>暂无内容。</p>";
@@ -195,13 +185,27 @@ function buildUpdatePreviewState(form: HTMLFormElement | null, authorName: strin
   };
 }
 
-function getPreviewTitle(content: string) {
-  const firstLine = content
+function getPreviewTitle(content: unknown) {
+  const firstLine = slateContentToText(createSlateContentValue(content))
     .split(/\n+/)
     .map((line) => line.trim())
     .find(Boolean);
 
   return firstLine ? firstLine.slice(0, 32) : "未命名动态";
+}
+
+function parseSlateContent(formData: FormData) {
+  const raw = getFormValue(formData, "content");
+
+  if (!raw) {
+    return createSlateContentValue(null);
+  }
+
+  try {
+    return createSlateContentValue(JSON.parse(raw));
+  } catch {
+    return createSlateContentValue(raw);
+  }
 }
 
 function getFormValue(formData: FormData, key: string) {
@@ -223,7 +227,7 @@ function SaveButton() {
       name="intent"
       value="save"
       disabled={pending}
-      className="inline-flex items-center justify-center border border-transparent bg-zinc-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+      className="inline-flex h-10 w-full items-center justify-center px-1 text-sm font-medium text-primary transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
     >
       {pending ? "保存中..." : "保存动态"}
     </button>
@@ -239,7 +243,7 @@ function PublishButton({ isPublished }: { isPublished: boolean }) {
       name="intent"
       value="publish"
       disabled={pending}
-      className="inline-flex items-center justify-center border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-70 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
+      className="inline-flex h-10 w-full items-center justify-center px-1 text-[0.98rem] font-semibold text-primary underline decoration-1 underline-offset-4 transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60 dark:text-sky-300 sm:w-auto"
     >
       {pending ? "发布中..." : isPublished ? "更新并发布" : "发布动态"}
     </button>
@@ -250,7 +254,7 @@ function DiscardRevisionButton({ updateId }: { updateId: number }) {
   return (
     <ConfirmActionDialog
       triggerLabel="删除修订"
-      triggerClassName="inline-flex items-center border-b border-transparent px-0 py-1 text-xs font-medium text-zinc-500 transition hover:border-zinc-300 hover:text-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
+      triggerClassName="inline-flex h-8 w-full items-center justify-center rounded-full border border-transparent px-2.5 text-xs font-medium text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300 dark:hover:bg-rose-500/10 sm:w-auto"
       title="删除这条草稿？"
       description="删除后会恢复到上一个已发布版本，当前草稿内容会被丢弃。"
       confirmLabel="删除修订"
@@ -266,7 +270,7 @@ function PreviewButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-10 items-center justify-center px-1 text-sm font-medium text-zinc-500 transition hover:text-primary dark:text-zinc-400 dark:hover:text-sky-300"
+      className="inline-flex h-10 w-full items-center justify-center px-1 text-sm font-medium text-zinc-500 transition hover:text-primary dark:text-zinc-400 dark:hover:text-sky-300 sm:w-auto"
     >
       预览
     </button>
