@@ -455,7 +455,6 @@ export function SiteHeader({
       </div>
 
       <AdminLoginDialog
-        adminHasUsers={adminHasUsers}
         isOpen={isAdminLoginOpen}
         next={adminLoginNext}
         onClose={closeAdminLogin}
@@ -547,6 +546,7 @@ export function SiteHeader({
                                 {
                                   postCategories,
                                   recentArchiveItems,
+                                  recentUpdateItems,
                                 },
                                 () => setIsMobileNavOpen(false),
                               )}
@@ -721,6 +721,7 @@ function renderMobileNavContent(
   navigationData: {
     postCategories: SiteHeaderPostCategory[];
     recentArchiveItems: SiteHeaderRecentArchiveItem[];
+    recentUpdateItems: SiteHeaderRecentArchiveItem[];
   },
   onNavigate: () => void,
 ) {
@@ -736,18 +737,26 @@ function renderMobileNavContent(
     case "/posts":
       return (
         <div className="flex flex-wrap gap-2">
-          {navigationData.postCategories.map((category) => (
-            <MobileNavChip
-              key={category.href}
-              href={category.href}
-              label={category.label}
-              onNavigate={onNavigate}
-            />
-          ))}
+          {navigationData.postCategories.length > 0 ? (
+            navigationData.postCategories.map((category) => (
+              <MobileNavChip
+                key={category.href}
+                href={category.href}
+                label={category.label}
+                onNavigate={onNavigate}
+              />
+            ))
+          ) : (
+            <MobileNavEmptyState text="No posts yet." />
+          )}
         </div>
       );
     case "/updates":
-      return <MobileNavSubLink href="/updates" label="最新动态" onNavigate={onNavigate} />;
+      return navigationData.recentUpdateItems.length > 0 ? (
+        <MobileNavSubLink href="/updates" label="最新动态" onNavigate={onNavigate} />
+      ) : (
+        <MobileNavEmptyState text="No updates yet." />
+      );
     case "/timeline":
       return (
         <div className="grid gap-2">
@@ -829,7 +838,7 @@ function PostMegaNavContent({
     postCategories[0];
 
   if (!activeCategory) {
-    return null;
+    return <MegaNavEmptyState text="No posts yet." />;
   }
 
   return (
@@ -971,6 +980,14 @@ function MegaNavArticleLink({
 }
 
 function MegaNavEmptyState({ text }: { text: string }) {
+  return (
+    <div className="px-1 py-1 text-sm text-zinc-400 dark:text-zinc-500">
+      {text}
+    </div>
+  );
+}
+
+function MobileNavEmptyState({ text }: { text: string }) {
   return (
     <div className="px-1 py-1 text-sm text-zinc-400 dark:text-zinc-500">
       {text}

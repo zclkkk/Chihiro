@@ -5,8 +5,7 @@ import { ArchiveTimeline, type ArchiveYearGroup } from "@/components/archive-tim
 import { SearchDialog } from "@/components/search-dialog";
 import { ScrollToTopLink } from "@/components/scroll-to-top-link";
 import { SiteLogoMark } from "@/components/site-logo-mark";
-import { listAllPublishedPosts } from "@/server/repositories/posts";
-import { listAllPublishedUpdates } from "@/server/repositories/updates";
+import { listPublicPosts, listPublicUpdates } from "@/server/public-content";
 
 type TimelinePageProps = {
   searchParams: Promise<{
@@ -39,7 +38,7 @@ const UPDATES_PER_PAGE = 10;
 export default async function TimelinePage({ searchParams }: TimelinePageProps) {
   const { type } = await searchParams;
   const archiveType = normalizeArchiveType(type);
-  const [posts, updates] = await Promise.all([listAllPublishedPosts(), listAllPublishedUpdates()]);
+  const [posts, updates] = await Promise.all([listPublicPosts(), listPublicUpdates()]);
   const items = getTimelineItems(archiveType, posts, updates);
   const groups = groupTimelineItemsByYearAndMonth(items);
 
@@ -126,8 +125,8 @@ function normalizeArchiveType(value?: string): ArchiveType {
 
 function getTimelineItems(
   type: ArchiveType,
-  posts: Awaited<ReturnType<typeof listAllPublishedPosts>>,
-  updates: Awaited<ReturnType<typeof listAllPublishedUpdates>>,
+  posts: Awaited<ReturnType<typeof listPublicPosts>>,
+  updates: Awaited<ReturnType<typeof listPublicUpdates>>,
 ): ArchiveItem[] {
   const postItems: ArchiveItem[] = posts.map((post) => ({
     id: post.id,

@@ -14,7 +14,6 @@ import {
 import {
   countAdminUsers,
   createAdminSessionRecord,
-  createAdminUser,
   deleteAdminSessionByToken,
   findActiveAdminSessionByToken,
   findAdminUserByUsername,
@@ -25,7 +24,6 @@ const scrypt = promisify(nodeScrypt);
 type AdminSignInResult =
   | {
       ok: true;
-      created: boolean;
     }
   | {
       ok: false;
@@ -61,14 +59,9 @@ export async function signInAdmin(username: string, password: string): Promise<A
   const existingUserCount = await countAdminUsers();
 
   if (existingUserCount === 0) {
-    const passwordHash = await hashPassword(normalizedPassword);
-    const user = await createAdminUser(normalizedUsername, passwordHash);
-
-    await createAdminSession(user.id);
-
     return {
-      ok: true,
-      created: true,
+      ok: false,
+      error: "当前还没有管理员帐号，请先完成初始化。",
     };
   }
 
@@ -94,7 +87,6 @@ export async function signInAdmin(username: string, password: string): Promise<A
 
   return {
     ok: true,
-    created: false,
   };
 }
 
@@ -146,13 +138,6 @@ async function getCurrentAdminSession() {
   }
 
   return session;
-}
-
-async function hashPassword(password: string) {
-  const salt = randomBytes(16);
-  const derivedKey = (await scrypt(password, salt, 64)) as Buffer;
-
-  return `${salt.toString("hex")}:${derivedKey.toString("hex")}`;
 }
 
 async function verifyPasswordHash(password: string, storedHash: string) {

@@ -4,7 +4,7 @@ import { getPostPath } from "@/lib/routes";
 import { SearchDialog } from "@/components/search-dialog";
 import { PostTagsPanel } from "@/components/post-tags-panel";
 import { RelativeDate } from "@/components/relative-date";
-import { listAllPublishedPosts } from "@/server/repositories/posts";
+import { listPublicPosts } from "@/server/public-content";
 
 type PostsPageProps = {
   searchParams: Promise<{
@@ -15,7 +15,7 @@ type PostsPageProps = {
   }>;
 };
 
-type PublishedPost = Awaited<ReturnType<typeof listAllPublishedPosts>>[number];
+type PublishedPost = Awaited<ReturnType<typeof listPublicPosts>>[number];
 
 export default async function PostsPage({ searchParams }: PostsPageProps) {
   const { category, tag, sort, page } = await searchParams;
@@ -24,7 +24,7 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
   );
   const activeSort = getSortValue(sort);
   const currentPage = getPageValue(page);
-  const allPosts = await listAllPublishedPosts();
+  const allPosts = await listPublicPosts();
 
   const filteredPosts = allPosts.filter((post) => {
     if (category === "uncategorized") {

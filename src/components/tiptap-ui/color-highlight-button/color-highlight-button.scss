@@ -20,7 +20,8 @@
     filter: brightness(95%);
     mix-blend-mode: multiply;
 
-    .dark & {
+    .dark &,
+    html[data-theme="dark"] & {
       filter: brightness(140%);
       mix-blend-mode: lighten;
     }
@@ -28,6 +29,23 @@
 }
 
 .tiptap-button {
+  &:disabled {
+    .tiptap-button-highlight {
+      opacity: 0.42;
+      filter: saturate(72%);
+
+      &::after {
+        filter: none;
+        mix-blend-mode: normal;
+        border-color: color-mix(
+          in srgb,
+          var(--highlight-color) 40%,
+          transparent
+        );
+      }
+    }
+  }
+
   &[data-active-state="on"] {
     .tiptap-button-highlight {
       &::after {
@@ -36,11 +54,11 @@
     }
   }
 
-  .dark & {
+  .dark &,
+  html[data-theme="dark"] & {
     &[data-active-state="on"] {
       .tiptap-button-highlight {
         &::after {
-          // Andere Eigenschaft für .dark Kontext
           filter: brightness(180%);
         }
       }

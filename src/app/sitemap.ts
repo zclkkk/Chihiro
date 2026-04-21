@@ -1,10 +1,10 @@
 import type { MetadataRoute } from "next";
 import { getPostPath } from "@/lib/routes";
 import { absoluteUrl } from "@/lib/site";
-import { listAllPublishedPosts } from "@/server/repositories/posts";
+import { listPublicPosts } from "@/server/public-content";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const posts = await listAllPublishedPosts();
+  const posts = await listPublicPosts();
   const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: absoluteUrl("/"),

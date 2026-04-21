@@ -6,11 +6,13 @@ import {
 import { getPostPath, getUpdateAnchorPath } from "@/lib/routes";
 import { SiteFooter } from "@/components/site-footer";
 import { siteConfig } from "@/lib/site";
-import { hasAdminUsers, isAdminAuthenticated } from "@/server/auth";
-import { listPostCategories } from "@/server/repositories/categories";
-import { listAllPublishedPosts } from "@/server/repositories/posts";
-import { getSiteSettings } from "@/server/repositories/site";
-import { listAllPublishedUpdates } from "@/server/repositories/updates";
+import {
+  getPublicAdminState,
+  getPublicSiteSettings,
+  listPublicPostCategories,
+  listPublicPosts,
+  listPublicUpdates,
+} from "@/server/public-content";
 
 export default async function SiteLayout({
   children,
@@ -21,30 +23,28 @@ export default async function SiteLayout({
     posts,
     updates,
     postCategoryRecords,
-    adminHasUsers,
-    isAdminLoggedIn,
     siteSettings,
+    adminState,
   ] =
     await Promise.all([
-    listAllPublishedPosts(),
-    listAllPublishedUpdates(),
-    listPostCategories(),
-    hasAdminUsers(),
-    isAdminAuthenticated(),
-    getSiteSettings(),
+    listPublicPosts(),
+    listPublicUpdates(),
+    listPublicPostCategories(),
+    getPublicSiteSettings(),
+    getPublicAdminState(),
   ]);
   const postCategories = getPostCategories(postCategoryRecords, posts);
   const recentArchiveItems = getRecentArchiveItems(posts, updates);
   const recentUpdateItems = getRecentUpdateItems(updates);
-  const adminDisplayName = siteSettings?.authorName ?? siteConfig.author;
-  const adminAvatarUrl = siteSettings?.authorAvatarUrl ?? siteConfig.avatar;
+  const adminDisplayName = siteSettings.authorName ?? siteConfig.author;
+  const adminAvatarUrl = siteSettings.authorAvatarUrl ?? siteConfig.avatar;
 
   return (
     <div className="relative flex min-h-full flex-col bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
       <div aria-hidden="true" className="site-bottom-noise" />
       <SiteHeader
-        adminHasUsers={adminHasUsers}
-        isAdminLoggedIn={isAdminLoggedIn}
+        adminHasUsers={adminState.adminHasUsers}
+        isAdminLoggedIn={adminState.isAdminLoggedIn}
         adminDisplayName={adminDisplayName}
         adminAvatarUrl={adminAvatarUrl}
         postCategories={postCategories}
@@ -60,8 +60,8 @@ export default async function SiteLayout({
 const UPDATE_LIST_PAGE_SIZE = 10;
 
 function getPostCategories(
-  categories: Awaited<ReturnType<typeof listPostCategories>>,
-  posts: Awaited<ReturnType<typeof listAllPublishedPosts>>,
+  categories: Awaited<ReturnType<typeof listPublicPostCategories>>,
+  posts: Awaited<ReturnType<typeof listPublicPosts>>,
 ): SiteHeaderPostCategory[] {
   const groups = new Map<string, SiteHeaderPostCategory["posts"]>();
   const uncategorizedPosts: SiteHeaderPostCategory["posts"] = [];
@@ -125,8 +125,8 @@ function compareSiteHeaderCategories(
 }
 
 function getRecentArchiveItems(
-  posts: Awaited<ReturnType<typeof listAllPublishedPosts>>,
-  updates: Awaited<ReturnType<typeof listAllPublishedUpdates>>,
+  posts: Awaited<ReturnType<typeof listPublicPosts>>,
+  updates: Awaited<ReturnType<typeof listPublicUpdates>>,
 ): SiteHeaderRecentArchiveItem[] {
   return [
     ...posts.map((post) => ({
@@ -158,7 +158,7 @@ function getRecentArchiveItems(
 }
 
 function getRecentUpdateItems(
-  updates: Awaited<ReturnType<typeof listAllPublishedUpdates>>,
+  updates: Awaited<ReturnType<typeof listPublicUpdates>>,
 ): SiteHeaderRecentArchiveItem[] {
   return updates
     .map((item, index) => ({

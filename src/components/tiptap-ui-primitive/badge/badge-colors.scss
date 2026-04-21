@@ -26,7 +26,8 @@
   ); //more important badge
 
   /* Dark mode */
-  .dark & {
+  .dark &,
+  html[data-theme="dark"] & {
     --tt-badge-border-color: var(--tt-gray-dark-a-200);
     --tt-badge-border-color-subdued: var(--tt-gray-dark-a-200);
     --tt-badge-border-color-emphasized: var(--tt-gray-dark-a-500);
@@ -77,7 +78,8 @@
     ); //more important badge
 
     /* Dark mode */
-    .dark & {
+    .dark &,
+    html[data-theme="dark"] & {
       --tt-badge-border-color: var(--tt-gray-dark-a-200);
       --tt-badge-border-color-subdued: var(--tt-gray-dark-a-200);
       --tt-badge-border-color-emphasized: var(--tt-gray-dark-a-500);
@@ -129,7 +131,8 @@
     --tt-badge-icon-color-emphasized: var(--white); //more important badge
 
     /* Dark mode */
-    .dark & {
+    .dark &,
+    html[data-theme="dark"] & {
       --tt-badge-border-color: var(--tt-gray-dark-a-200);
       --tt-badge-border-color-subdued: var(--tt-gray-dark-a-200);
       --tt-badge-border-color-emphasized: var(--tt-gray-dark-a-500);

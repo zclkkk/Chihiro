@@ -5,11 +5,11 @@ import { getRenderedContentHtml } from "@/lib/content";
 import { getPostPath } from "@/lib/routes";
 import { RelativeDate } from "@/components/relative-date";
 import {
-  getPublishedPostByCategoryAndSlug,
-  getPublishedPostBySlug,
-  getPublishedPostRouteParams,
-  getPublishedPostSlugs,
-} from "@/server/repositories/posts";
+  getPublicPostByCategoryAndSlug,
+  getPublicPostBySlug,
+  getPublicPostRouteParams,
+  getPublicPostSlugs,
+} from "@/server/public-content";
 
 type PostPageProps = {
   params: Promise<{
@@ -37,8 +37,8 @@ function getRouteState(segments: string[]) {
 
 export async function generateStaticParams() {
   const [routeParams, slugs] = await Promise.all([
-    getPublishedPostRouteParams(),
-    getPublishedPostSlugs(),
+    getPublicPostRouteParams(),
+    getPublicPostSlugs(),
   ]);
 
   return [
@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: PostPageProps): Promise<Metad
     };
   }
 
-  const post = await getPublishedPostBySlug(routeState.slug);
+  const post = await getPublicPostBySlug(routeState.slug);
 
   if (!post) {
     return {
@@ -80,7 +80,7 @@ export default async function PostPage({ params }: PostPageProps) {
   }
 
   if (!routeState.category) {
-    const post = await getPublishedPostBySlug(routeState.slug);
+    const post = await getPublicPostBySlug(routeState.slug);
 
     if (!post) {
       notFound();
@@ -89,10 +89,10 @@ export default async function PostPage({ params }: PostPageProps) {
     permanentRedirect(getPostPath({ slug: post.slug, categorySlug: post.category?.slug }));
   }
 
-  const post = await getPublishedPostByCategoryAndSlug(routeState.category, routeState.slug);
+  const post = await getPublicPostByCategoryAndSlug(routeState.category, routeState.slug);
 
   if (!post) {
-    const canonicalPost = await getPublishedPostBySlug(routeState.slug);
+    const canonicalPost = await getPublicPostBySlug(routeState.slug);
 
     if (canonicalPost) {
       permanentRedirect(getPostPath({ slug: canonicalPost.slug, categorySlug: canonicalPost.category?.slug }));

@@ -1,10 +1,10 @@
 import { getContentText } from "@/lib/content";
 import { getPostPath } from "@/lib/routes";
 import { absoluteUrl, siteConfig } from "@/lib/site";
-import { listAllPublishedPosts } from "@/server/repositories/posts";
+import { listPublicPosts, getPublicSiteSettings } from "@/server/public-content";
 
 export async function GET() {
-  const posts = await listAllPublishedPosts();
+  const [posts, siteSettings] = await Promise.all([listPublicPosts(), getPublicSiteSettings()]);
   const feedUrl = absoluteUrl("/rss.xml");
   const siteUrl = absoluteUrl("/");
 
@@ -33,8 +33,8 @@ export async function GET() {
   <channel>
     <title>${escapeXml(siteConfig.name)}</title>
     <link>${siteUrl}</link>
-    <description>${escapeXml(siteConfig.description)}</description>
-    <language>${siteConfig.locale}</language>
+    <description>${escapeXml(siteSettings.siteDescription ?? siteConfig.description)}</description>
+    <language>${siteSettings.locale ?? siteConfig.locale}</language>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
     <atom:link href="${feedUrl}" rel="self" type="application/rss+xml" xmlns:atom="http://www.w3.org/2005/Atom" />
     ${items}

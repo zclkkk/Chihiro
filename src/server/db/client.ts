@@ -7,33 +7,53 @@ const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: PrismaClient;
 };
 
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error("DATABASE_URL is not set.");
+function getConnectionString() {
+  return process.env.DATABASE_URL?.trim() || null;
 }
 
-const pool =
-  globalForPrisma.pool ??
-  new Pool({
-    connectionString,
-  });
-
-const adapter = new PrismaPg(pool);
-
-function createPrismaClient() {
-  return new PrismaClient({
-    adapter,
-    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
-  });
+export function hasDatabaseUrl() {
+  return Boolean(getConnectionString());
 }
 
-export const prisma: PrismaClient =
-  process.env.NODE_ENV === "development"
-    ? createPrismaClient()
-    : globalForPrisma.prisma ?? createPrismaClient();
+function getPrismaClient() {
+  const connectionString = getConnectionString();
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.pool = pool;
-  globalForPrisma.prisma = prisma;
+  if (!connectionString) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const pool =
+    globalForPrisma.pool ??
+    new Pool({
+      connectionString,
+    });
+
+  const adapter = new PrismaPg(pool);
+  const client =
+    process.env.NODE_ENV === "development"
+      ? new PrismaClient({
+          adapter,
+          log: ["warn", "error"],
+        })
+      : globalForPrisma.prisma ??
+        new PrismaClient({
+          adapter,
+          log: ["error"],
+        });
+
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.pool = pool;
+    globalForPrisma.prisma = client;
+  }
+
+  return client;
 }
+
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, property, receiver) {
+    const client = getPrismaClient();
+    const value = Reflect.get(client, property, client);
+
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});

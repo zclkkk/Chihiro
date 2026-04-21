@@ -11,14 +11,12 @@ const initialState: AdminLoginState = {
 };
 
 type AdminLoginDialogProps = {
-  adminHasUsers: boolean;
   isOpen: boolean;
   next: string | null;
   onClose: () => void;
 };
 
 export function AdminLoginDialog({
-  adminHasUsers,
   isOpen,
   next,
   onClose,
@@ -78,15 +76,13 @@ export function AdminLoginDialog({
               </button>
 
               <p className="text-[0.72rem] font-medium uppercase tracking-[0.26em] text-zinc-400 dark:text-zinc-500">
-                {adminHasUsers ? "Admin Access" : "Initialize Admin"}
+                Admin Access
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-                {adminHasUsers ? "登录后台" : "创建后台帐号"}
+                登录后台
               </h2>
               <p className="mt-3 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                {adminHasUsers
-                  ? "输入后台帐号和密码后进入管理界面。"
-                  : "当前还没有管理员。首次提交会创建第一个后台帐号并自动登录。"}
+                输入后台帐号和密码后进入管理界面。
               </p>
 
               <form action={formAction} className="mt-6 grid gap-4">

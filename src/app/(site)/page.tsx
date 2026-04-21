@@ -1,12 +1,12 @@
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { siteConfig } from "@/lib/site";
-import { getSiteSettings } from "@/server/repositories/site";
+import { getPublicSiteSettings } from "@/server/public-content";
 
 export default async function HomePage() {
-  const siteSettings = await getSiteSettings();
-  const authorName = siteSettings?.authorName ?? siteConfig.author;
-  const avatarUrl = siteSettings?.authorAvatarUrl ?? siteConfig.avatar;
-  const summary = siteSettings?.summary ?? siteConfig.summary;
+  const siteSettings = await getPublicSiteSettings();
+  const authorName = siteSettings.authorName ?? siteConfig.author;
+  const avatarUrl = siteSettings.authorAvatarUrl ?? siteConfig.avatar;
+  const summary = siteSettings.summary ?? siteConfig.summary;
 
   return (
     <main className="relative flex min-h-screen w-full items-center px-6 py-16 sm:px-12 lg:px-24">

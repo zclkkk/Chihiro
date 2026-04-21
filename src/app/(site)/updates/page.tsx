@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getContentPreview, getContentText } from "@/lib/content";
 import { getUpdateAnchorPath } from "@/lib/routes";
 import { SearchDialog } from "@/components/search-dialog";
-import { listAllPublishedUpdates } from "@/server/repositories/updates";
+import { listPublicUpdates } from "@/server/public-content";
 
 type UpdatesPageProps = {
   searchParams: Promise<{
@@ -11,13 +11,13 @@ type UpdatesPageProps = {
   }>;
 };
 
-type PublishedUpdate = Awaited<ReturnType<typeof listAllPublishedUpdates>>[number];
+type PublishedUpdate = Awaited<ReturnType<typeof listPublicUpdates>>[number];
 
 export default async function UpdatesPage({ searchParams }: UpdatesPageProps) {
   const { sort, page } = await searchParams;
   const activeSort = getSortValue(sort);
   const currentPage = getPageValue(page);
-  const allUpdates = await listAllPublishedUpdates();
+  const allUpdates = await listPublicUpdates();
   const sortedUpdates = sortUpdates(allUpdates, activeSort);
   const totalPages = Math.max(1, Math.ceil(sortedUpdates.length / UPDATES_PER_PAGE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
