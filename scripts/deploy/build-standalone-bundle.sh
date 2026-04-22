@@ -34,7 +34,13 @@ fi
 
 mkdir -p "$DIST_ROOT"
 rm -f "$ARCHIVE_PATH"
-tar -C "$PACKAGE_DIR" -czf "$ARCHIVE_PATH" .
+
+# Avoid macOS AppleDouble metadata files (._xxx) leaking into the archive
+# when packaging on macOS. COPYFILE_DISABLE tells BSD tar to skip them.
+COPYFILE_DISABLE=1 tar \
+  --exclude='._*' \
+  --exclude='.DS_Store' \
+  -C "$PACKAGE_DIR" -czf "$ARCHIVE_PATH" .
 
 echo "Created standalone bundle:"
 echo "  $ARCHIVE_PATH"

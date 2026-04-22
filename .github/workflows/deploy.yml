@@ -1,0 +1,33 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          APP_DIR: ${{ vars.DEPLOY_PATH || '/srv/chihiro/current' }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+          PM2_APP_NAME: ${{ vars.PM2_APP_NAME || 'chihiro' }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ vars.DEPLOY_PORT || 22 }}
+          script_stop: true
+          envs: APP_DIR,DEPLOY_BRANCH,PM2_APP_NAME
+          script: |
+            cd "$APP_DIR"
+            bash scripts/deploy/server-deploy.sh
