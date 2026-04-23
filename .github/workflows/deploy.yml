@@ -89,5 +89,6 @@ jobs:
           script_stop: true
           envs: APP_DIR,DEPLOY_BRANCH,PM2_APP_NAME,ARTIFACT_PATH
           script: |
+            git config --global --add safe.directory "$APP_DIR"
             cd "$APP_DIR"
             bash scripts/deploy/server-deploy.sh
