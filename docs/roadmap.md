@@ -9,18 +9,23 @@
 - 公开站点已经有首页、文章列表、文章详情、动态列表、动态详情、归档页基础
 - `posts` 页已经具备 query 驱动的分页、排序、分类和标签筛选
 - `updates` 页已经基本对齐 `posts` 的分页与筛选逻辑
-- 第一版 `prisma/schema.prisma` 已经落地，数据库已完成 `db push`
-- `Prisma`、`prisma.config.ts`、Prisma Client、`src/server/db/client.ts` 已经接入
-- `posts / updates / assets / site / admin-auth` repository 已经建立并开始承担真实数据访问
-- 当前站点的文章、动态、标签、分类、站点配置、资源占位数据已经 seed 到数据库
-- 公开页已经切到 repository：
+- 已完成从 Prisma + 自定义认证 + 占位资源到 Supabase 原生技术栈的迁移：
+  - 数据库：Prisma → Supabase Postgres（SQL 迁移 + RLS）
+  - 认证：自定义 cookie + AdminUser/AdminSession → Supabase Auth（email/password + SSR cookie）
+  - 存储：占位上传 → Supabase Storage（`site-assets` 存储桶）
+  - 数据访问：`src/server/repositories/*` → `src/server/supabase/*`
+  - 主键策略：Integer → UUID
+  - 修订系统：JSON snapshot → 专用修订表（`post_revisions` / `update_revisions`）
+  - 类型系统：Prisma 枚举 → 本地 TS 类型联合（`src/types/domain.ts`）
+- 四个 Supabase 客户端工厂已建立（browser / server / anon / admin）
+- 公开页已切到 Supabase 数据层：
   - 首页读取站点配置
   - `/posts`、`/posts/[slug]`
   - `/updates`、`/updates/[slug]`
   - `/archives`
   - `rss.xml`
   - `sitemap.xml`
-- 后台登录、session cookie 鉴权、`/admin` 路由保护和登出流程已经接入
+- 后台登录已迁移到 Supabase Auth（email/password），session cookie 由 `@supabase/ssr` 管理
 - 后台编辑台已经合并成 `/admin/workbench`，上方是撰写入口，下方是文章 / 动态 / 分类 / 标签管理区
 - 后台文章管理已经支持：
   - 编辑文章
@@ -28,47 +33,46 @@
   - 发布文章 / 更新并发布
   - 删除文章
   - 删除已保存修订
-- 已发布文章再次编辑时，会优先回填 `draftSnapshot`，而不是原始发布版本
-- 草稿现在会单独记录 `draftSnapshot.savedAt`，编辑页底部会提示当前正在编辑的是哪一次保存的草稿
+- 修订表已替代旧的 JSON snapshot，草稿和发布修订独立存储
 - `保存草稿` 会保留在当前编辑页，不会跳回编辑台
 - `发布文章` / `更新并发布` 成功后会跳回编辑台
 - 发布后的 `revalidatePath` 已经接入首页、列表页、详情页、归档、RSS、sitemap 刷新
 - 架构方向已经确认：
   - 单租户、单站点 CMS
-  - `Postgres + Prisma + S3/R2`
+  - `Supabase（Postgres + Auth + Storage）`
   - 公开页采用 ISR
   - 列表页状态放入 URL query
   - 正文内容分为 `content` 与 `contentHtml`
+  - UUID 主键、修订表、本地 TS 类型
 
 当前最重要的变化是：
 
-项目已经不再停留在“页面方向”和“数据骨架”阶段，公开展示链路、后台编辑闭环、草稿修订链路与基础发布链路都已经跑通了。
+项目已完成 Supabase 迁移，公开展示链路、后台编辑闭环、草稿修订链路与基础发布链路都已跑通。
 
 现在真正缺的是：
 
 - 稳定的 `content -> contentHtml` 渲染链路
-- 上传与资源引用能力
+- 上传与资源引用能力的完善
 
 ## 当前还没做的关键部分
 
 下面这些是现在最重要、但还没有真正完成的部分：
 
 - `content -> contentHtml` 的正式渲染链路
-- 对象存储上传与 `Asset` 引用
-- 富文本编辑器
+- 富文本编辑器体验打磨
 
 ## 接下来推荐顺序
 
 ### 1. 先完成后台内容创建与编辑闭环
 
-这部分已经基本完成了，当前重点不再是“能不能写”，而是把写作体验再磨顺。
+这部分已经基本完成了，当前重点不再是"能不能写"，而是把写作体验再磨顺。
 
 目前后台已经有：
 
-- 登录保护
+- 登录保护（Supabase Auth）
 - 内容概览
 - 编辑台
-- 草稿修订回填
+- 修订表回填
 - 发布 / 转回草稿
 
 当前编辑页已经支持：
@@ -80,7 +84,7 @@
 - 保存已发布文章的修订稿
 - 删除修订后恢复到上一次已发布版本
 
-这一阶段的重点已经从“把功能做出来”转成“把工作流做顺”。
+这一阶段的重点已经从"把功能做出来"转成"把工作流做顺"。
 
 ### 2. 补 `content -> contentHtml` 的最小可用渲染链路
 
@@ -108,26 +112,23 @@
 - 已发布文章编辑时继续回填修订稿
 - 发布前校验必填字段
 - 发布后继续复用现有 `revalidatePath`
-- 必要时补“预览”或“最近修改内容”
+- 必要时补"预览"或"最近修改内容"
 
-这一阶段做完，后台才算从“管理已有数据”变成“真正的内容工作台”。
+这一阶段做完，后台才算从"管理已有数据"变成"真正的内容工作台"。
 
-### 4. 接对象存储上传
+### 4. 打磨资源上传与引用
 
-然后再做资源能力：
+当前资源上传已接入 Supabase Storage，后续需要：
 
-- 接对象存储上传
-- 建 `Asset` 元数据记录
-- 让文章和动态内容可以引用图片
-- 本地文件仅作为开发环境 fallback
+- 打磨编辑器内的图片上传体验
+- 完善资源管理界面
+- 让文章和动态内容可以更方便地引用图片
 
-如果在编辑闭环之前先做上传，后面通常还会回头改资源插入方式，所以推荐放在编辑链路之后。
-
-### 5. 最后再接富文本编辑器
+### 5. 最后再打磨富文本编辑器
 
 编辑器建议放在上面这些地基之后。
 
-推荐第一版只做：
+当前已接入 Tiptap，第一版支持：
 
 - 段落
 - 标题
@@ -157,6 +158,6 @@
 
 下一步最应该开始做的是：
 
-**`后台创建 / 编辑 -> content 渲染链路 -> 编辑动作补全 -> 上传 -> 编辑器`**
+**`后台创建 / 编辑 -> content 渲染链路 -> 编辑动作补全 -> 上传打磨 -> 编辑器打磨`**
 
 这条路径更符合当前真实进度，也最不容易返工。

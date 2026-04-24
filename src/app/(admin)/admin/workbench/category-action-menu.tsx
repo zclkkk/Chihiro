@@ -6,7 +6,7 @@ import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type CategoryActionMenuProps = {
-  categoryId: number;
+  categoryId: string;
 };
 
 export function CategoryActionMenu({ categoryId }: CategoryActionMenuProps) {

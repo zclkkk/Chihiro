@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { ContentStatus } from "@prisma/client";
+import { CONTENT_STATUS } from "@/types/domain";
 import { ContentListPanel, StatusBadge } from "@/app/(admin)/admin/ui";
-import { listPostCategories } from "@/server/repositories/categories";
-import { listPostsForAdmin } from "@/server/repositories/posts";
-import { listTags } from "@/server/repositories/tags";
-import { listUpdatesForAdmin } from "@/server/repositories/updates";
+import { listPostCategories } from "@/server/supabase/categories";
+import { listPostsForAdmin } from "@/server/supabase/posts";
+import { listTags } from "@/server/supabase/tags";
+import { listUpdatesForAdmin } from "@/server/supabase/updates";
 import { WorkbenchCategoryPanel } from "@/app/(admin)/admin/workbench/workbench-category-panel";
 import { TagCloudPanel } from "@/app/(admin)/admin/workbench/tag-cloud-panel";
 import { WorkbenchContentSwitcher } from "@/app/(admin)/admin/workbench/workbench-content-switcher";
@@ -13,6 +13,7 @@ import { UpdateActionMenu } from "@/app/(admin)/admin/workbench/update-action-me
 import { formatAdminDateTime } from "@/app/(admin)/admin/utils";
 import { getContentText } from "@/lib/content";
 import { ChevronRight } from "lucide-react";
+import type { PostItem, UpdateItem, TagOption } from "@/types/domain";
 
 type WorkbenchSearchParams = Promise<{
   sort?: string;
@@ -105,7 +106,7 @@ export default async function AdminWorkbenchPage({
                   编辑文章
                   <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
-                <PostActionMenu postId={item.id} isPublished={item.status === ContentStatus.PUBLISHED} />
+                <PostActionMenu postId={item.id} isPublished={item.status === CONTENT_STATUS.PUBLISHED} />
               </>
             )}
           />
@@ -132,10 +133,7 @@ function getWorkbenchSortValue(value?: string) {
   return "updated";
 }
 
-function sortWorkbenchPosts(
-  items: Awaited<ReturnType<typeof listPostsForAdmin>>,
-  sort: "created" | "updated",
-) {
+function sortWorkbenchPosts(items: PostItem[], sort: "created" | "updated") {
   const nextItems = [...items];
 
   nextItems.sort((left, right) => {
@@ -148,10 +146,7 @@ function sortWorkbenchPosts(
   return nextItems;
 }
 
-function sortWorkbenchUpdates(
-  items: Awaited<ReturnType<typeof listUpdatesForAdmin>>,
-  sort: "created" | "updated",
-) {
+function sortWorkbenchUpdates(items: UpdateItem[], sort: "created" | "updated") {
   const nextItems = [...items];
 
   nextItems.sort((left, right) => {
@@ -171,11 +166,7 @@ function compareDates(left?: string | null, right?: string | null) {
   return leftTime - rightTime;
 }
 
-function UpdateListPanel({
-  items,
-}: {
-  items: Awaited<ReturnType<typeof listUpdatesForAdmin>>;
-}) {
+function UpdateListPanel({ items }: { items: UpdateItem[] }) {
   return (
     <section className="border-b border-zinc-200/80 pb-5 dark:border-zinc-800/80">
       <div>
@@ -207,7 +198,7 @@ function UpdateListPanel({
                       <ChevronRight className="h-3.5 w-3.5" />
                     </Link>
                     <UpdateActionMenu
-                      isPublished={item.status === ContentStatus.PUBLISHED}
+                      isPublished={item.status === CONTENT_STATUS.PUBLISHED}
                       updateId={item.id}
                     />
                   </div>
@@ -225,11 +216,11 @@ function UpdateListPanel({
   );
 }
 
-function getUpdatePreviewText(item: Awaited<ReturnType<typeof listUpdatesForAdmin>>[number]) {
+function getUpdatePreviewText(item: UpdateItem) {
   return getContentText(item.contentHtml, item.content) || "空内容";
 }
 
-function formatUpdateTime(item: Awaited<ReturnType<typeof listUpdatesForAdmin>>[number]) {
+function formatUpdateTime(item: UpdateItem) {
   return formatAdminDateTime(item.publishedAt ?? item.updatedAt);
 }
 
@@ -259,10 +250,7 @@ function WriteEntry({
   );
 }
 
-function getTagCloudItems(
-  tags: Awaited<ReturnType<typeof listTags>>,
-  posts: Awaited<ReturnType<typeof listPostsForAdmin>>,
-) {
+function getTagCloudItems(tags: TagOption[], posts: PostItem[]) {
   const items = new Map<
     string,
     {

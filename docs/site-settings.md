@@ -46,8 +46,8 @@
 
 代码入口：
 
-- 表结构：`prisma/schema.prisma`
-- 读取：`src/server/repositories/site.ts`
+- 表结构：`supabase/migrations/20260425000000_initial_schema.sql`
+- 读取：`src/server/supabase/site.ts`
 - 后台保存：`src/app/(admin)/admin/settings/actions.ts`
 
 `SiteSettings` 是当前项目里的单站点运行时配置表。后台设置页修改的内容，应该最终写入这里。

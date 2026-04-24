@@ -10,7 +10,7 @@ import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type UpdateActionMenuProps = {
-  updateId: number;
+  updateId: string;
   isPublished: boolean;
 };
 

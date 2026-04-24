@@ -1,84 +1,69 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdminSession } from "@/server/auth";
-import { getSiteSettings, upsertSiteSettings } from "@/server/repositories/site";
-import { isSiteUrlLockedByEnv, siteConfig } from "@/lib/site";
+import { requireAdmin } from "@/server/auth";
+import { upsertSiteSettings, getSiteSettings } from "@/server/supabase/site";
+import { siteConfig } from "@/lib/site";
+import type { SiteSettingsRecord } from "@/types/domain";
 
-export type SaveGeneralSettingsState = {
+export type SettingsFormState = {
   error: string | null;
-  success: string | null;
+  success: boolean;
 };
 
-export async function saveGeneralSettingsAction(
-  _previousState: SaveGeneralSettingsState,
+export async function saveSettingsAction(
+  _previousState: SettingsFormState,
   formData: FormData,
-): Promise<SaveGeneralSettingsState> {
-  await requireAdminSession();
+): Promise<SettingsFormState> {
+  await requireAdmin();
 
-  const siteUrlLocked = isSiteUrlLockedByEnv();
-
-  const siteName = getRequiredString(formData, "siteName", "站点名");
-  const authorName = getRequiredString(formData, "authorName", "作者");
-  const submittedSiteUrl = siteUrlLocked
-    ? null
-    : getRequiredUrl(formData, "siteUrl", "站点地址");
-  const email = getOptionalEmail(formData, "email", "邮箱");
-  const githubUrl = getOptionalUrl(formData, "githubUrl", "GitHub");
+  const siteName = getRequiredString(formData, "siteName");
+  const siteUrl = getRequiredString(formData, "siteUrl");
+  const authorName = getRequiredString(formData, "authorName");
   const heroIntro = getOptionalString(formData, "heroIntro");
   const summary = getOptionalString(formData, "summary");
   const motto = getOptionalString(formData, "motto");
+  const email = getOptionalString(formData, "email");
+  const githubUrl = getOptionalString(formData, "githubUrl");
+
+  const currentSettings = await getSiteSettings();
+
+  const settings: SiteSettingsRecord = {
+    siteName,
+    siteDescription: currentSettings?.siteDescription ?? siteConfig.description,
+    siteUrl,
+    locale: currentSettings?.locale ?? siteConfig.locale,
+    authorName,
+    authorAvatarUrl: currentSettings?.authorAvatarUrl ?? null,
+    heroIntro,
+    summary,
+    motto,
+    email,
+    githubUrl,
+  };
 
   try {
-    const currentSettings = await getSiteSettings();
-
-    const siteUrl =
-      submittedSiteUrl ??
-      currentSettings?.siteUrl ??
-      siteConfig.url;
-
-    await upsertSiteSettings({
-      siteName,
-      siteDescription: currentSettings?.siteDescription ?? siteConfig.description,
-      siteUrl,
-      locale: currentSettings?.locale ?? siteConfig.locale,
-      authorName,
-      authorAvatarUrl: currentSettings?.authorAvatarUrl ?? siteConfig.avatar,
-      heroIntro,
-      summary,
-      motto,
-      email,
-      githubUrl,
-    });
+    await upsertSiteSettings(settings);
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : "保存常规设置时出错了。",
-      success: null,
+      error: error instanceof Error ? error.message : "保存设置时出错了。",
+      success: false,
     };
   }
 
-  revalidatePath("/");
-  revalidatePath("/posts");
-  revalidatePath("/updates");
-  revalidatePath("/timeline");
-  revalidatePath("/more");
-  revalidatePath("/message");
-  revalidatePath("/rss.xml");
-  revalidatePath("/sitemap.xml");
-  revalidatePath("/admin");
-  revalidatePath("/admin/settings");
+  revalidateSettingsSurface();
 
   return {
     error: null,
-    success: "常规设置已更新。",
+    success: true,
   };
 }
 
-function getRequiredString(formData: FormData, key: string, label: string) {
+function getRequiredString(formData: FormData, key: string) {
   const value = getOptionalString(formData, key);
 
   if (!value) {
-    throw new Error(`请填写${label}。`);
+    throw new Error(`请填写 ${key}。`);
   }
 
   return value;
@@ -95,39 +80,13 @@ function getOptionalString(formData: FormData, key: string) {
   return normalized ? normalized : null;
 }
 
-function parseUrl(value: string, label: string) {
-  try {
-    return new URL(value).toString().replace(/\/$/, "");
-  } catch {
-    throw new Error(`请填写有效的${label}。`);
-  }
-}
-
-function getRequiredUrl(formData: FormData, key: string, label: string) {
-  const value = getRequiredString(formData, key, label);
-  return parseUrl(value, label);
-}
-
-function getOptionalUrl(formData: FormData, key: string, label: string) {
-  const value = getOptionalString(formData, key);
-
-  if (!value) {
-    return null;
-  }
-
-  return parseUrl(value, label);
-}
-
-function getOptionalEmail(formData: FormData, key: string, label: string) {
-  const value = getOptionalString(formData, key);
-
-  if (!value) {
-    return null;
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-    throw new Error(`请填写有效的${label}。`);
-  }
-
-  return value;
+function revalidateSettingsSurface() {
+  revalidatePath("/admin");
+  revalidatePath("/admin/settings");
+  revalidatePath("/");
+  revalidatePath("/posts");
+  revalidatePath("/updates");
+  revalidatePath("/timeline");
+  revalidatePath("/rss.xml");
+  revalidatePath("/sitemap.xml");
 }

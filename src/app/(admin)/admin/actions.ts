@@ -3,21 +3,21 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getPostPath } from "@/lib/routes";
-import { requireAdminSession } from "@/server/auth";
+import { requireAdmin } from "@/server/auth";
 import {
   deletePostById,
   publishPostById,
   unpublishPostById,
-} from "@/server/repositories/posts";
+} from "@/server/supabase/posts";
 import {
   deleteUpdateById,
   publishUpdateById,
   unpublishUpdateById,
-} from "@/server/repositories/updates";
+} from "@/server/supabase/updates";
 
 export async function publishPostAction(formData: FormData) {
-  await requireAdminSession();
-  const id = getRequiredPostId(formData, "id");
+  await requireAdmin();
+  const id = getRequiredId(formData, "id");
   const post = await publishPostById(id);
 
   revalidatePostSurface(post.slug, post.category?.slug);
@@ -25,8 +25,8 @@ export async function publishPostAction(formData: FormData) {
 }
 
 export async function unpublishPostAction(formData: FormData) {
-  await requireAdminSession();
-  const id = getRequiredPostId(formData, "id");
+  await requireAdmin();
+  const id = getRequiredId(formData, "id");
   const post = await unpublishPostById(id);
 
   revalidatePostSurface(post.slug, post.category?.slug);
@@ -34,8 +34,8 @@ export async function unpublishPostAction(formData: FormData) {
 }
 
 export async function deletePostAction(formData: FormData) {
-  await requireAdminSession();
-  const id = getRequiredPostId(formData, "id");
+  await requireAdmin();
+  const id = getRequiredId(formData, "id");
   const post = await deletePostById(id);
 
   revalidatePostSurface(post.slug, post.category?.slug);
@@ -43,7 +43,7 @@ export async function deletePostAction(formData: FormData) {
 }
 
 export async function publishUpdateAction(formData: FormData) {
-  await requireAdminSession();
+  await requireAdmin();
   const id = getRequiredId(formData, "id");
   await publishUpdateById(id);
 
@@ -52,7 +52,7 @@ export async function publishUpdateAction(formData: FormData) {
 }
 
 export async function unpublishUpdateAction(formData: FormData) {
-  await requireAdminSession();
+  await requireAdmin();
   const id = getRequiredId(formData, "id");
   await unpublishUpdateById(id);
 
@@ -61,7 +61,7 @@ export async function unpublishUpdateAction(formData: FormData) {
 }
 
 export async function deleteUpdateAction(formData: FormData) {
-  await requireAdminSession();
+  await requireAdmin();
   const id = getRequiredId(formData, "id");
   await deleteUpdateById(id);
 
@@ -101,22 +101,7 @@ function getRequiredString(formData: FormData, key: string) {
   return value;
 }
 
-function getRequiredPostId(formData: FormData, key: string) {
-  const value = getRequiredString(formData, key);
-
-  if (!/^\d+$/.test(value)) {
-    throw new Error("请填写有效的文章编号。");
-  }
-
-  return Number(value);
-}
-
 function getRequiredId(formData: FormData, key: string) {
   const value = getRequiredString(formData, key);
-
-  if (!/^\d+$/.test(value)) {
-    throw new Error("请填写有效的编号。");
-  }
-
-  return Number(value);
+  return value;
 }

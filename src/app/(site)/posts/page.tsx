@@ -92,7 +92,7 @@ async function PostsPageContent({
 
     if (
       selectedTags.length > 0 &&
-      !selectedTags.every((item) => post.tags.some((tagItem) => tagItem.slug === item))
+      !selectedTags.every((item) => post.tags.some((tagItem: { slug: string }) => tagItem.slug === item))
     ) {
       return false;
     }

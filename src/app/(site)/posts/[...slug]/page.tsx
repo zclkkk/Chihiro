@@ -169,7 +169,7 @@ export default async function PostPage({ params }: PostPageProps) {
                   {post.category.name}
                 </Link>
               ) : null}
-              {post.tags.map((tag) => (
+              {post.tags.map((tag: { id: string; name: string; slug: string }) => (
                 <Link
                   key={tag.id}
                   href={`/posts?tag=${encodeURIComponent(tag.slug)}`}

@@ -1,10 +1,10 @@
 import { AdminPageHeader } from "@/app/(admin)/admin/ui";
 import { PostEditorForm } from "@/app/(admin)/admin/compose/post/post-editor-form";
 import { resolveCanonicalSiteUrl, siteConfig } from "@/lib/site";
-import { listPostCategories } from "@/server/repositories/categories";
-import { getPostByIdForAdmin } from "@/server/repositories/posts";
-import { getSiteSettings } from "@/server/repositories/site";
-import { listTags } from "@/server/repositories/tags";
+import { listPostCategories } from "@/server/supabase/categories";
+import { getPostByIdForAdmin } from "@/server/supabase/posts";
+import { getSiteSettings } from "@/server/supabase/site";
+import { listTags } from "@/server/supabase/tags";
 
 type AdminComposePostPageProps = {
   searchParams: Promise<{
@@ -17,7 +17,7 @@ export default async function AdminComposePostPage({
   searchParams,
 }: AdminComposePostPageProps) {
   const { id } = await searchParams;
-  const postId = getPostId(id);
+  const postId = id || null;
   const [post, categories, tags, siteSettings] = await Promise.all([
     postId ? getPostByIdForAdmin(postId) : Promise.resolve(null),
     listPostCategories(),
@@ -31,7 +31,7 @@ export default async function AdminComposePostPage({
       <AdminPageHeader eyebrow="Post" title={post ? "编辑文章" : "撰写新文章"} />
 
       <PostEditorForm
-        key={post ? `${post.id}:${post.draftSnapshot?.savedAt ?? post.updatedAt}` : "new-post"}
+        key={post ? `${post.id}:${post.updatedAt}` : "new-post"}
         post={post}
         categories={categories}
         tags={tags}
@@ -40,16 +40,4 @@ export default async function AdminComposePostPage({
       />
     </div>
   );
-}
-
-function getPostId(value?: string) {
-  if (!value) {
-    return null;
-  }
-
-  if (!/^\d+$/.test(value)) {
-    return null;
-  }
-
-  return Number(value);
 }

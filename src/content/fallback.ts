@@ -1,8 +1,5 @@
 import { siteConfig } from "@/lib/site";
-import type { CategoryOption } from "@/server/repositories/categories";
-import type { PostItem } from "@/server/repositories/posts";
-import type { SiteSettingsRecord } from "@/server/repositories/site";
-import type { UpdateItem } from "@/server/repositories/updates";
+import type { CategoryOption, PostItem, SiteSettingsRecord, UpdateItem } from "@/types/domain";
 
 export const fallbackSiteSettings: SiteSettingsRecord = {
   siteName: siteConfig.name,
@@ -23,7 +20,7 @@ export const fallbackPosts: PostItem[] = [];
 export const fallbackUpdates: UpdateItem[] = [];
 
 export function deriveFallbackCategories(posts: PostItem[]): CategoryOption[] {
-  const categories = new Map<number, CategoryOption>();
+  const categories = new Map<string, CategoryOption>();
 
   for (const post of posts) {
     if (!post.category) {

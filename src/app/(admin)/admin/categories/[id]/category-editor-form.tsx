@@ -5,15 +5,14 @@ import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import {
   createCategoryAction,
-  saveCategoryAction,
-  type SaveCategoryEditorState,
+  updateCategoryAction,
+  type CategoryFormState,
 } from "@/app/(admin)/admin/categories/actions";
 import { EmptyPanel } from "@/app/(admin)/admin/ui";
-import type { CategoryOption } from "@/server/repositories/categories";
+import type { CategoryOption } from "@/types/domain";
 
-const initialState: SaveCategoryEditorState = {
+const initialState: CategoryFormState = {
   error: null,
-  redirectTo: null,
   createdCategory: null,
 };
 
@@ -25,15 +24,15 @@ export function CategoryEditorForm({ category }: CategoryEditorFormProps) {
   const router = useRouter();
   const isCreateMode = !category;
   const [state, formAction] = useActionState(
-    isCreateMode ? createCategoryAction : saveCategoryAction,
+    isCreateMode ? createCategoryAction : updateCategoryAction,
     initialState,
   );
 
   useEffect(() => {
-    if (state.redirectTo) {
-      router.replace(state.redirectTo);
+    if (!state.error && !isCreateMode) {
+      router.replace("/admin/workbench?tab=categories");
     }
-  }, [router, state.redirectTo]);
+  }, [router, state.error, isCreateMode]);
 
   return (
     <form action={formAction} className="grid gap-6">

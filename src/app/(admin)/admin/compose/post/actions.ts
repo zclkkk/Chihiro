@@ -1,19 +1,19 @@
 "use server";
 
-import { ContentStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getPostPath } from "@/lib/routes";
 import { parseStoredRichTextContent } from "@/lib/rich-text-content";
-import { requireAdminSession } from "@/server/auth";
+import { requireAdmin } from "@/server/auth";
 import {
   discardPostRevisionById,
   getPostByIdForAdmin,
   publishPostById,
   savePostDraft,
-} from "@/server/repositories/posts";
-import { getSiteSettings } from "@/server/repositories/site";
+} from "@/server/supabase/posts";
+import { getSiteSettings } from "@/server/supabase/site";
 import { siteConfig } from "@/lib/site";
+import { CONTENT_STATUS, type ContentStatus } from "@/types/domain";
 
 export type SavePostEditorState = {
   error: string | null;
@@ -23,7 +23,7 @@ export async function savePostDraftAction(
   _previousState: SavePostEditorState,
   formData: FormData,
 ): Promise<SavePostEditorState> {
-  await requireAdminSession();
+  await requireAdmin();
   const intent = getOptionalString(formData, "intent") ?? "save";
   const currentStatus = getContentStatus(formData, "currentStatus");
 
@@ -33,7 +33,7 @@ export async function savePostDraftAction(
   const summary = getOptionalString(formData, "summary");
   const content = parseRichTextContent(formData);
   const contentHtml = getOptionalString(formData, "contentHtml");
-  const categoryId = getOptionalNumber(formData, "categoryId");
+  const categoryId = getOptionalString(formData, "categoryId");
   const publishedAtInput = getOptionalString(formData, "publishedAt");
   const publishedAt = publishedAtInput ? parsePublishedAtInput(publishedAtInput) : null;
   const tagIds = formData
@@ -41,7 +41,7 @@ export async function savePostDraftAction(
     .filter((value): value is string => typeof value === "string")
     .map((value) => value.trim())
     .filter(Boolean);
-  const postId = getOptionalPostId(formData, "postId");
+  const postId = getOptionalString(formData, "postId");
   const siteSettings = await getSiteSettings();
   const authorName = siteSettings?.authorName ?? siteConfig.author;
 
@@ -51,7 +51,7 @@ export async function savePostDraftAction(
       title,
       slug,
       summary,
-      content: content as unknown as Prisma.JsonValue,
+      content,
       contentHtml,
       status: currentStatus,
       categoryId,
@@ -70,7 +70,7 @@ export async function savePostDraftAction(
     revalidatePath("/admin/workbench");
     revalidatePath("/admin/compose/post");
   } catch (error) {
-    if (isUniqueSlugError(error)) {
+    if (isUniqueConstraintError(error)) {
       return {
         error: "这个 slug 已经被占用了，请换一个。",
       };
@@ -91,15 +91,15 @@ export async function savePostDraftAction(
 }
 
 export async function discardPostRevisionAction(formData: FormData) {
-  await requireAdminSession();
-  const postId = getRequiredPostId(formData, "postId");
+  await requireAdmin();
+  const postId = getRequiredString(formData, "postId");
   const currentPost = await getPostByIdForAdmin(postId);
 
   if (!currentPost) {
     throw new Error("草稿不存在或已被删除。");
   }
 
-  if (!currentPost.draftSnapshot) {
+  if (!currentPost.hasDraftRevision) {
     throw new Error("这篇文章没有可以删除的草稿。");
   }
 
@@ -123,16 +123,6 @@ function getRequiredString(formData: FormData, key: string) {
   return value;
 }
 
-function getRequiredPostId(formData: FormData, key: string) {
-  const value = getOptionalPostId(formData, key);
-
-  if (value === null) {
-    throw new Error(`请填写 ${key}。`);
-  }
-
-  return value;
-}
-
 function getOptionalString(formData: FormData, key: string) {
   const value = formData.get(key);
 
@@ -142,34 +132,6 @@ function getOptionalString(formData: FormData, key: string) {
 
   const normalized = value.trim();
   return normalized ? normalized : null;
-}
-
-function getOptionalPostId(formData: FormData, key: string) {
-  const value = getOptionalString(formData, key);
-
-  if (!value) {
-    return null;
-  }
-
-  if (!/^\d+$/.test(value)) {
-    throw new Error("请填写有效的文章编号。");
-  }
-
-  return Number(value);
-}
-
-function getOptionalNumber(formData: FormData, key: string) {
-  const value = getOptionalString(formData, key);
-
-  if (!value) {
-    return null;
-  }
-
-  if (!/^\d+$/.test(value)) {
-    throw new Error(`请填写有效的 ${key}。`);
-  }
-
-  return Number(value);
 }
 
 function parseRichTextContent(formData: FormData) {
@@ -191,7 +153,7 @@ function parseRichTextContent(formData: FormData) {
 function getContentStatus(formData: FormData, key: string): ContentStatus {
   const value = getOptionalString(formData, key);
 
-  return value === ContentStatus.PUBLISHED ? ContentStatus.PUBLISHED : ContentStatus.DRAFT;
+  return value === CONTENT_STATUS.PUBLISHED ? CONTENT_STATUS.PUBLISHED : CONTENT_STATUS.DRAFT;
 }
 
 function normalizeSlug(value: string) {
@@ -240,10 +202,11 @@ function parsePublishedAtInput(value: string) {
   return date;
 }
 
-function isUniqueSlugError(error: unknown) {
+function isUniqueConstraintError(error: unknown) {
   return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
+    error instanceof Error &&
+    "code" in error &&
+    (error as any).code === "23505"
   );
 }
 

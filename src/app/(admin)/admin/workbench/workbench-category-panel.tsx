@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { CategoryOption } from "@/server/repositories/categories";
+import type { CategoryOption } from "@/types/domain";
 import { CategoryActionMenu } from "@/app/(admin)/admin/workbench/category-action-menu";
 
 type WorkbenchCategoryPanelProps = {

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, JetBrains_Mono, Noto_Serif_SC } from "next/font/google";
 import { ThemeModeInit } from "@/components/theme-mode-init";
 import { resolveCanonicalSiteUrl, siteConfig } from "@/lib/site";
-import { getSiteSettings } from "@/server/repositories/site";
+import { getSiteSettings } from "@/server/supabase/site";
 import "./globals.css";
 
 const uiSans = Geist({

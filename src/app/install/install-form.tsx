@@ -34,9 +34,9 @@ export function InstallForm({ defaults, needsAdminSetup }: InstallFormProps) {
     () => [
       {
         id: 1 as const,
-        eyebrow: "Database",
-        title: "确认数据库状态",
-        description: "这一阶段只确认初始化条件是否就绪。数据库连接串和表结构都准备好之后，才能继续写入站点信息和管理员。",
+        eyebrow: "Supabase",
+        title: "确认 Supabase 状态",
+        description: "这一阶段确认 Supabase 环境变量已配置，数据库连接就绪。",
       },
       {
         id: 2 as const,
@@ -49,7 +49,7 @@ export function InstallForm({ defaults, needsAdminSetup }: InstallFormProps) {
         eyebrow: "Admin",
         title: needsAdminSetup ? "创建首个管理员" : "确认并完成初始化",
         description: needsAdminSetup
-          ? "首个管理员只会在当前数据库里没有管理员帐号时创建。"
+          ? "首个管理员使用 Supabase Auth 创建，通过邮箱和密码登录。"
           : "当前数据库已经有管理员帐号，这一步只负责确认并完成初始化。",
       },
     ],
@@ -122,14 +122,14 @@ export function InstallForm({ defaults, needsAdminSetup }: InstallFormProps) {
         <section className="grid gap-5 border-t border-zinc-200/80 pt-6 dark:border-zinc-800/80">
           <div className="grid gap-4 md:grid-cols-3">
             <StepInfoCard
-              label="DATABASE_URL"
+              label="Supabase URL"
               value="已配置"
-              description="初始化流程已经拿到数据库连接串。"
+              description="NEXT_PUBLIC_SUPABASE_URL 环境变量已就绪。"
             />
             <StepInfoCard
-              label="Schema"
+              label="Supabase Key"
               value="已就绪"
-              description="当前数据库表结构已经满足初始化要求。"
+              description="NEXT_PUBLIC_SUPABASE_ANON_KEY 环境变量已就绪。"
             />
             <StepInfoCard
               label="Install Marker"
@@ -163,8 +163,9 @@ export function InstallForm({ defaults, needsAdminSetup }: InstallFormProps) {
         <section className="grid gap-5 border-t border-zinc-200/80 pt-6 dark:border-zinc-800/80">
           {needsAdminSetup ? (
             <div className="grid gap-5 md:grid-cols-2">
-              <Field label="管理员帐号" name="adminUsername" defaultValue="admin" required />
-              <Field label="管理员密码" name="adminPassword" type="password" required />
+              <Field label="管理员邮箱" name="email" type="email" required placeholder="admin@example.com" />
+              <Field label="管理员密码" name="password" type="password" required placeholder="至少 8 位" />
+              <Field label="确认密码" name="confirmPassword" type="password" required placeholder="再次输入密码" />
             </div>
           ) : (
             <div className="rounded-[1.5rem] border border-zinc-200/80 bg-zinc-50/80 px-5 py-4 text-sm leading-7 text-zinc-600 dark:border-zinc-800/80 dark:bg-zinc-900/60 dark:text-zinc-300">
@@ -246,6 +247,7 @@ function Field({
   onChange,
   type = "text",
   required = false,
+  placeholder,
 }: {
   label: string;
   name: string;
@@ -254,6 +256,7 @@ function Field({
   onChange?: (value: string) => void;
   type?: string;
   required?: boolean;
+  placeholder?: string;
 }) {
   return (
     <label className="grid gap-2">
@@ -265,6 +268,7 @@ function Field({
         defaultValue={value === undefined ? defaultValue : undefined}
         value={value}
         onChange={(event) => onChange?.(event.target.value)}
+        placeholder={placeholder}
         className="h-12 rounded-2xl border border-zinc-200/80 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-primary/40 dark:border-zinc-800/80 dark:bg-zinc-950/80 dark:text-zinc-100 dark:placeholder:text-zinc-500"
       />
     </label>

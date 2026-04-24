@@ -1,6 +1,6 @@
 "use client";
 
-import { ContentStatus } from "@prisma/client";
+import { CONTENT_STATUS, type ContentStatus } from "@/types/domain";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
@@ -18,7 +18,7 @@ import { formatAdminDateTime } from "@/app/(admin)/admin/utils";
 import { getRenderedContentHtml } from "@/lib/content";
 import { getRichTextPreviewTitle, parseStoredRichTextContent } from "@/lib/rich-text-content";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
-import type { UpdateItem } from "@/server/repositories/updates";
+import type { UpdateItem } from "@/types/domain";
 
 const initialState: SaveUpdateEditorState = {
   error: null,
@@ -40,15 +40,14 @@ type UpdatePreviewState = {
 export function UpdateEditorForm({ update, authorName }: UpdateEditorFormProps) {
   const router = useRouter();
   const [state, formAction] = useActionState(saveUpdateAction, initialState);
-  const editableUpdate = getEditableUpdate(update);
+  const editableUpdate = update;
   const formRef = useRef<HTMLFormElement | null>(null);
   const [previewState, setPreviewState] = useState<UpdatePreviewState | null>(null);
   const [isEditorDirty, setIsEditorDirty] = useState(false);
   const wasDirtyBeforeSubmitRef = useRef(false);
-  const draftSavedAt = getDraftSavedAt(update);
-  const hasSavedRevision = Boolean(update?.status === ContentStatus.PUBLISHED && draftSavedAt);
-  const bottomPrompt = getBottomPrompt(update, draftSavedAt);
-  const status = update?.status ?? ContentStatus.DRAFT;
+  const hasSavedRevision = Boolean(update?.hasDraftRevision && update.status === CONTENT_STATUS.PUBLISHED);
+  const bottomPrompt = getBottomPrompt(update);
+  const status = update?.status ?? CONTENT_STATUS.DRAFT;
 
   useUnsavedChangesWarning(isEditorDirty);
 
@@ -107,7 +106,7 @@ export function UpdateEditorForm({ update, authorName }: UpdateEditorFormProps) 
         footerLeft={
           <>
             <p className="min-w-0 text-xs text-zinc-500 dark:text-zinc-400">{bottomPrompt}</p>
-            {hasSavedRevision ? <DiscardRevisionButton updateId={update?.id ?? 0} /> : null}
+            {hasSavedRevision && update?.id ? <DiscardRevisionButton updateId={update.id} /> : null}
           </>
         }
         footerRight={
@@ -116,7 +115,7 @@ export function UpdateEditorForm({ update, authorName }: UpdateEditorFormProps) 
             onClick={() => setPreviewState(buildUpdatePreviewState(formRef.current, authorName))}
           />
             <SaveButton />
-            <PublishButton isPublished={status === ContentStatus.PUBLISHED} />
+            <PublishButton isPublished={status === CONTENT_STATUS.PUBLISHED} />
           </>
         }
       />
@@ -141,42 +140,20 @@ export function UpdateEditorForm({ update, authorName }: UpdateEditorFormProps) 
   );
 }
 
-function getBottomPrompt(update: UpdateItem | null, draftSavedAt: string | null) {
+function getBottomPrompt(update: UpdateItem | null) {
   if (!update) {
     return "当前是新撰写。可以先保存为草稿，也可以直接发布。";
   }
 
-  if (draftSavedAt) {
-    return `当前正在编辑 ${formatAdminDateTime(draftSavedAt)} 保存的草稿，公开页仍在使用上一个已发布版本。`;
+  if (update.hasDraftRevision && update.status === CONTENT_STATUS.PUBLISHED) {
+    return "当前正在编辑草稿修订，公开页仍在使用上一个已发布版本。";
   }
 
-  if (update.status === ContentStatus.PUBLISHED) {
+  if (update.status === CONTENT_STATUS.PUBLISHED) {
     return "当前是已发布动态。保存会保留草稿，只有点击更新并发布才会更新公开页。";
   }
 
   return "当前是已保存的草稿。可以继续编辑，也可以直接发布。";
-}
-
-function getEditableUpdate(update: UpdateItem | null) {
-  if (!update?.draftSnapshot) {
-    return update;
-  }
-
-  return {
-    ...update,
-    title: update.draftSnapshot.title,
-    content: update.draftSnapshot.content,
-    contentHtml: update.draftSnapshot.contentHtml,
-    publishedAt: update.draftSnapshot.publishedAt,
-  };
-}
-
-function getDraftSavedAt(update: UpdateItem | null) {
-  if (!update?.draftSnapshot) {
-    return null;
-  }
-
-  return update.draftSnapshot.savedAt ?? null;
 }
 
 function buildUpdatePreviewState(form: HTMLFormElement | null, authorName: string): UpdatePreviewState | null {
@@ -248,7 +225,7 @@ function PublishButton({ isPublished }: { isPublished: boolean }) {
   );
 }
 
-function DiscardRevisionButton({ updateId }: { updateId: number }) {
+function DiscardRevisionButton({ updateId }: { updateId: string }) {
   return (
     <ConfirmActionDialog
       triggerLabel="删除修订"

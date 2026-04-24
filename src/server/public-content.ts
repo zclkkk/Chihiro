@@ -1,26 +1,15 @@
-import { getPostPath, getUpdateAnchorPath } from "@/lib/routes";
+import "server-only";
+
 import { hasAdminUsers, isAdminAuthenticated } from "@/server/auth";
-import { hasDatabaseUrl } from "@/server/db/client";
-import {
-  isDatabaseSchemaMissingError,
-  isDatabaseUnavailableError,
-} from "@/server/database-errors";
 import { getInstallationState } from "@/server/installation";
-import { listPostCategories, type CategoryOption } from "@/server/repositories/categories";
-import {
-  getPublishedPostRouteParams,
-  getPublishedPostSlugs,
-  listAllPublishedPosts,
-  listPublishedPostCategoriesForNavigation,
-  listRecentPublishedPostsForNavigation,
-  type PostItem,
-} from "@/server/repositories/posts";
-import { getSiteSettings, type SiteSettingsRecord } from "@/server/repositories/site";
-import {
-  listAllPublishedUpdates,
-  listRecentPublishedUpdatesForNavigation,
-  type UpdateItem,
-} from "@/server/repositories/updates";
+import { getSiteSettings } from "@/server/supabase/site";
+import { listAllPublishedPosts } from "@/server/supabase/posts";
+import { listAllPublishedUpdates } from "@/server/supabase/updates";
+import { listPostCategories } from "@/server/supabase/categories";
+import { listRecentPublishedPostsForNavigation, listPublishedPostCategoriesForNavigation } from "@/server/supabase/posts";
+import { listRecentPublishedUpdatesForNavigation } from "@/server/supabase/updates";
+import { getPostPath, getUpdateAnchorPath } from "@/lib/routes";
+import type { SiteSettingsRecord, PostItem, UpdateItem, CategoryOption } from "@/types/domain";
 
 export class PublicSiteUnavailableError extends Error {
   constructor() {
@@ -50,7 +39,7 @@ export type PublicHeaderPostCategory = {
   href: string;
   contentCount: number;
   posts: Array<{
-    id: number;
+    id: string;
     slug: string;
     title: string;
     href: string;
@@ -58,7 +47,7 @@ export type PublicHeaderPostCategory = {
 };
 
 export type PublicRecentArchiveItem = {
-  id: number;
+  id: string;
   href: string;
   title: string;
   categoryLabel: string;
@@ -69,43 +58,17 @@ export type PublicRecentArchiveItem = {
 export async function getPublicSiteSettings(): Promise<SiteSettingsRecord> {
   await assertInstalledPublicSite();
 
-  if (!hasDatabaseUrl()) {
+  const settings = await getSiteSettings();
+  if (!settings) {
     throw new PublicSiteUnavailableError();
   }
 
-  try {
-    const settings = await getSiteSettings();
-
-    if (!settings) {
-      throw new PublicSiteUnavailableError();
-    }
-
-    return settings;
-  } catch (error) {
-    if (isDatabaseUnavailableError(error) || isDatabaseSchemaMissingError(error)) {
-      throw new PublicSiteUnavailableError();
-    }
-
-    throw error;
-  }
+  return settings;
 }
 
 export async function listPublicPosts(): Promise<PostItem[]> {
   await assertInstalledPublicSite();
-
-  if (!hasDatabaseUrl()) {
-    throw new PublicSiteUnavailableError();
-  }
-
-  try {
-    return await listAllPublishedPosts();
-  } catch (error) {
-    if (isDatabaseUnavailableError(error) || isDatabaseSchemaMissingError(error)) {
-      throw new PublicSiteUnavailableError();
-    }
-
-    throw error;
-  }
+  return await listAllPublishedPosts();
 }
 
 export async function getPublicPostBySlug(slug: string): Promise<PostItem | null> {
@@ -118,119 +81,54 @@ export async function getPublicPostByCategoryAndSlug(
   slug: string,
 ): Promise<PostItem | null> {
   const post = await getPublicPostBySlug(slug);
-
-  if (!post) {
-    return null;
-  }
-
+  if (!post) return null;
   const expectedCategorySlug = post.category?.slug ?? "uncategorized";
   return expectedCategorySlug === categorySlug ? post : null;
 }
 
 export async function getPublicPostSlugs(): Promise<string[]> {
   await assertInstalledPublicSite();
-
-  if (!hasDatabaseUrl()) {
-    throw new PublicSiteUnavailableError();
-  }
-
-  try {
-    return await getPublishedPostSlugs();
-  } catch (error) {
-    if (isDatabaseUnavailableError(error) || isDatabaseSchemaMissingError(error)) {
-      throw new PublicSiteUnavailableError();
-    }
-
-    throw error;
-  }
+  return (await listAllPublishedPosts()).map((post) => post.slug);
 }
 
 export async function getPublicPostRouteParams(): Promise<Array<{ category: string; slug: string }>> {
   await assertInstalledPublicSite();
-
-  if (!hasDatabaseUrl()) {
-    throw new PublicSiteUnavailableError();
-  }
-
-  try {
-    return await getPublishedPostRouteParams();
-  } catch (error) {
-    if (isDatabaseUnavailableError(error) || isDatabaseSchemaMissingError(error)) {
-      throw new PublicSiteUnavailableError();
-    }
-
-    throw error;
-  }
+  return (await listAllPublishedPosts()).map((post) => ({
+    category: post.category?.slug ?? "uncategorized",
+    slug: post.slug,
+  }));
 }
 
 export async function listPublicUpdates(): Promise<UpdateItem[]> {
   await assertInstalledPublicSite();
-
-  if (!hasDatabaseUrl()) {
-    throw new PublicSiteUnavailableError();
-  }
-
-  try {
-    return await listAllPublishedUpdates();
-  } catch (error) {
-    if (isDatabaseUnavailableError(error) || isDatabaseSchemaMissingError(error)) {
-      throw new PublicSiteUnavailableError();
-    }
-
-    throw error;
-  }
+  return await listAllPublishedUpdates();
 }
 
 export async function listPublicPostCategories(): Promise<CategoryOption[]> {
   await assertInstalledPublicSite();
-
-  if (!hasDatabaseUrl()) {
-    throw new PublicSiteUnavailableError();
-  }
-
-  try {
-    return await listPostCategories();
-  } catch (error) {
-    if (isDatabaseUnavailableError(error) || isDatabaseSchemaMissingError(error)) {
-      throw new PublicSiteUnavailableError();
-    }
-
-    throw error;
-  }
+  return await listPostCategories();
 }
 
 export async function listPublicHeaderPostCategories(): Promise<PublicHeaderPostCategory[]> {
   await assertInstalledPublicSite();
 
-  if (!hasDatabaseUrl()) {
-    throw new PublicSiteUnavailableError();
-  }
+  const categories = await listPublishedPostCategoriesForNavigation();
 
-  try {
-    const categories = await listPublishedPostCategoriesForNavigation();
-
-    return categories.map((category) => ({
-      slug: category.slug,
-      label: category.label,
-      href: `/posts?category=${encodeURIComponent(category.slug)}`,
-      contentCount: category.contentCount,
-      posts: category.posts.map((post) => ({
-        id: post.id,
+  return categories.map((category) => ({
+    slug: category.slug,
+    label: category.label,
+    href: `/posts?category=${encodeURIComponent(category.slug)}`,
+    contentCount: category.contentCount,
+    posts: category.posts.map((post) => ({
+      id: post.id,
+      slug: post.slug,
+      title: post.title,
+      href: getPostPath({
         slug: post.slug,
-        title: post.title,
-        href: getPostPath({
-          slug: post.slug,
-          categorySlug: category.slug === "uncategorized" ? null : category.slug,
-        }),
-      })),
-    }));
-  } catch (error) {
-    if (isDatabaseUnavailableError(error) || isDatabaseSchemaMissingError(error)) {
-      throw new PublicSiteUnavailableError();
-    }
-
-    throw error;
-  }
+        categorySlug: category.slug === "uncategorized" ? null : category.slug,
+      }),
+    })),
+  }));
 }
 
 export async function listPublicRecentArchiveItems(
@@ -238,68 +136,24 @@ export async function listPublicRecentArchiveItems(
 ): Promise<PublicRecentArchiveItem[]> {
   await assertInstalledPublicSite();
 
-  if (!hasDatabaseUrl()) {
-    throw new PublicSiteUnavailableError();
-  }
+  const [posts, updates] = await Promise.all([
+    listRecentPublishedPostsForNavigation(limit),
+    listRecentPublishedUpdatesForNavigation(limit),
+  ]);
 
-  try {
-    const [posts, updates] = await Promise.all([
-      listRecentPublishedPostsForNavigation(limit),
-      listRecentPublishedUpdatesForNavigation(limit),
-    ]);
-
-    return [
-      ...posts.map((post) => ({
-        id: post.id,
-        href: getPostPath({
-          slug: post.slug,
-          categorySlug: post.category?.slug,
-        }),
-        title: post.title,
-        categoryLabel: post.category?.name ?? "Uncategorized",
-        publishedAt: post.publishedAt,
-        kind: "文章" as const,
-      })),
-      ...updates.map((item) => ({
-        id: item.id,
-        href: getUpdateAnchorPath({
-          updateId: item.id,
-          page: 1,
-        }),
-        title: item.title,
-        categoryLabel: "动态",
-        publishedAt: item.publishedAt,
-        kind: "动态" as const,
-      })),
-    ]
-      .sort((a, b) => {
-        const leftTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
-        const rightTime = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
-        return rightTime - leftTime;
-      })
-      .slice(0, limit);
-  } catch (error) {
-    if (isDatabaseUnavailableError(error) || isDatabaseSchemaMissingError(error)) {
-      throw new PublicSiteUnavailableError();
-    }
-
-    throw error;
-  }
-}
-
-export async function listPublicRecentUpdateItems(
-  limit = 4,
-): Promise<PublicRecentArchiveItem[]> {
-  await assertInstalledPublicSite();
-
-  if (!hasDatabaseUrl()) {
-    throw new PublicSiteUnavailableError();
-  }
-
-  try {
-    const updates = await listRecentPublishedUpdatesForNavigation(limit);
-
-    return updates.map((item) => ({
+  return [
+    ...posts.map((post) => ({
+      id: post.id,
+      href: getPostPath({
+        slug: post.slug,
+        categorySlug: post.category?.slug,
+      }),
+      title: post.title,
+      categoryLabel: post.category?.name ?? "Uncategorized",
+      publishedAt: post.publishedAt,
+      kind: "文章" as const,
+    })),
+    ...updates.map((item) => ({
       id: item.id,
       href: getUpdateAnchorPath({
         updateId: item.id,
@@ -309,45 +163,49 @@ export async function listPublicRecentUpdateItems(
       categoryLabel: "动态",
       publishedAt: item.publishedAt,
       kind: "动态" as const,
-    }));
-  } catch (error) {
-    if (isDatabaseUnavailableError(error) || isDatabaseSchemaMissingError(error)) {
-      throw new PublicSiteUnavailableError();
-    }
+    })),
+  ]
+    .sort((a, b) => {
+      const leftTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+      const rightTime = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+      return rightTime - leftTime;
+    })
+    .slice(0, limit);
+}
 
-    throw error;
-  }
+export async function listPublicRecentUpdateItems(
+  limit = 4,
+): Promise<PublicRecentArchiveItem[]> {
+  await assertInstalledPublicSite();
+
+  const updates = await listRecentPublishedUpdatesForNavigation(limit);
+
+  return updates.map((item) => ({
+    id: item.id,
+    href: getUpdateAnchorPath({
+      updateId: item.id,
+      page: 1,
+    }),
+    title: item.title,
+    categoryLabel: "动态",
+    publishedAt: item.publishedAt,
+    kind: "动态" as const,
+  }));
 }
 
 export async function getPublicAdminState() {
   await assertInstalledPublicSite();
 
-  if (!hasDatabaseUrl()) {
-    throw new PublicSiteUnavailableError();
-  }
+  const [adminHasUsers, isAdminLoggedIn] = await Promise.all([
+    hasAdminUsers(),
+    isAdminAuthenticated(),
+  ]);
 
-  try {
-    const [adminHasUsers, isAdminLoggedIn] = await Promise.all([
-      hasAdminUsers(),
-      isAdminAuthenticated(),
-    ]);
-
-    return {
-      adminHasUsers,
-      isAdminLoggedIn,
-    };
-  } catch (error) {
-    if (isDatabaseUnavailableError(error) || isDatabaseSchemaMissingError(error)) {
-      throw new PublicSiteUnavailableError();
-    }
-
-    throw error;
-  }
+  return { adminHasUsers, isAdminLoggedIn };
 }
 
 async function assertInstalledPublicSite() {
   const installationState = await getInstallationState();
-
   if (!installationState.installed) {
     throw new UninstalledSiteError();
   }

@@ -1,10 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import {
-  clearAdminSession,
-  signInAdmin,
-} from "@/server/auth";
+import { createClient as createServerClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/server/auth";
 
 export type AdminLoginState = {
   error: string | null;
@@ -14,14 +12,20 @@ export async function loginAction(
   _previousState: AdminLoginState,
   formData: FormData,
 ): Promise<AdminLoginState> {
-  const username = getRequiredString(formData, "username");
+  const email = getRequiredString(formData, "email");
   const password = getRequiredString(formData, "password");
   const next = getOptionalString(formData, "next");
-  const result = await signInAdmin(username, password);
 
-  if (!result.ok) {
+  const supabase = await createServerClient();
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
     return {
-      error: result.error,
+      error: "邮箱或密码不正确。",
     };
   }
 
@@ -29,7 +33,8 @@ export async function loginAction(
 }
 
 export async function logoutAction() {
-  await clearAdminSession();
+  const supabase = await createServerClient();
+  await supabase.auth.signOut();
   redirect("/");
 }
 
