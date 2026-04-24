@@ -75,7 +75,7 @@ export async function signInAdmin(username: string, password: string): Promise<A
   if (backendStatus === "schema_missing") {
     return {
       ok: false,
-      error: "数据库表结构尚未初始化，请先运行 pnpm db:push。",
+      error: "数据库表结构尚未初始化，请先运行 npm run db:push。",
     };
   }
 

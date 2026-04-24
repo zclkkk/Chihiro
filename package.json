@@ -2,11 +2,10 @@
   "name": "chihiro",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@10.26.1",
+  "packageManager": "npm@10.8.2",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "package:standalone": "bash ./scripts/deploy/build-standalone-bundle.sh",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",

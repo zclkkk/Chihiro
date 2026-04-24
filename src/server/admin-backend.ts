@@ -44,7 +44,7 @@ export function getAdminBackendStatusMessage(status: Exclude<AdminBackendStatus,
     return {
       title: "数据库表结构尚未初始化",
       description:
-        "已经检测到 DATABASE_URL，但当前数据库里还没有 Chihiro 所需的表结构。先运行 pnpm db:push，再打开安装页完成首个管理员和站点初始化。",
+        "已经检测到 DATABASE_URL，但当前数据库里还没有 Chihiro 所需的表结构。先运行 npm run db:push，再打开安装页完成首个管理员和站点初始化。",
     };
   }
 

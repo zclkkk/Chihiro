@@ -25,8 +25,8 @@
 ## 本地启动
 
 ```bash
-pnpm install
-pnpm dev
+npm install
+npm run dev
 ```
 
 默认访问地址：
@@ -37,21 +37,19 @@ http://localhost:3000
 
 ## 本地数据库
 
-项目已经接入 `Prisma`，本地开发可以先只借用 `docker compose` 里的 Postgres：
-
+项目已经接入 `Prisma`，本地开发需要先准备一个可用的 PostgreSQL 数据库，并在 `.env` 中设置 `DATABASE_URL`：
+  
 ```bash
-cp .env.example .env
-docker compose up -d postgres
-pnpm db:push
-pnpm db:generate
+DATABASE_URL="postgresql://username:password@127.0.0.1:5432/chihiro?schema=public"
+npm run db:push
+npm run db:generate
 ```
 
-默认本地连接串已经写在 `.env.example` 里，对应 `docker-compose.yml` 里的数据库配置。
+完成后即可启动开发服务器。
 
 ## 文档索引
 
 - [架构设计](./docs/architecture.md)
-- [Docker 与 CI/CD 部署](./docs/docker-cicd.md)
 - [站点配置说明](./docs/site-settings.md)
 - [开发路线](./docs/roadmap.md)
 - [RSS 与 SEO 实现规划](./docs/rss-seo-plan.md)
