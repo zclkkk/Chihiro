@@ -53,7 +53,7 @@ export default async function InstallPage() {
             description="站点还没有完成安装。数据库已经可连接，但当前还没有 Chihiro 所需的表结构。先执行 db push，把表建好，再回来继续初始化。"
             helper={
               <code className="rounded-xl bg-zinc-100 px-3 py-2 text-xs text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-                pnpm db:push
+                npm run db:push
               </code>
             }
           />

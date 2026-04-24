@@ -39,7 +39,7 @@ export async function initializeSiteAction(
 
   if (installationState.status === "schema_missing") {
     return {
-      error: "数据库表结构还没有初始化，请先运行 pnpm db:push。",
+      error: "数据库表结构还没有初始化，请先运行 npm run db:push。",
     };
   }
 
