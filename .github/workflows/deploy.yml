@@ -10,85 +10,69 @@ concurrency:
   group: production-deploy
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  build:
+  docker:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Resolve image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
-          version: 10
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
         with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate Prisma client
-        run: pnpm exec prisma generate
-
-      - name: Type check
-        run: pnpm exec tsc --noEmit
-
-      - name: Build
-        run: pnpm build
-
-      - name: Package runtime artifact
-        run: |
-          tar -czf chihiro-build.tgz \
-            .next \
-            node_modules
-
-      - name: Upload runtime artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: chihiro-build
-          path: chihiro-build.tgz
-          retention-days: 7
+          context: .
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ github.sha }}
+            ${{ steps.image.outputs.name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
-    needs: build
+    needs: docker
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download runtime artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: chihiro-build
-
-      - name: Upload artifact to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ vars.DEPLOY_PORT || 22 }}
-          source: chihiro-build.tgz
-          target: /tmp
+      - name: Resolve image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
         env:
           APP_DIR: ${{ vars.DEPLOY_PATH || '/srv/chihiro/current' }}
           DEPLOY_BRANCH: ${{ github.ref_name }}
-          PM2_APP_NAME: ${{ vars.PM2_APP_NAME || 'chihiro' }}
-          ARTIFACT_PATH: /tmp/chihiro-build.tgz
+          CHIHIRO_IMAGE: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          COMPOSE_PROJECT_NAME: ${{ vars.COMPOSE_PROJECT_NAME || 'chihiro' }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ vars.DEPLOY_PORT || 22 }}
           script_stop: true
-          envs: APP_DIR,DEPLOY_BRANCH,PM2_APP_NAME,ARTIFACT_PATH
+          envs: APP_DIR,DEPLOY_BRANCH,CHIHIRO_IMAGE,COMPOSE_PROJECT_NAME,GHCR_USERNAME,GHCR_TOKEN
           script: |
             git config --global --add safe.directory "$APP_DIR"
             cd "$APP_DIR"
-            bash scripts/deploy/server-deploy.sh
+            bash scripts/deploy/docker-deploy.sh

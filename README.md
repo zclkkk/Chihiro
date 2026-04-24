@@ -37,11 +37,11 @@ http://localhost:3000
 
 ## 本地数据库
 
-项目已经接入 `Prisma`，本地开发可以先用 `docker compose` 启一个 Postgres：
+项目已经接入 `Prisma`，本地开发可以先只借用 `docker compose` 里的 Postgres：
 
 ```bash
-docker compose up -d
 cp .env.example .env
+docker compose up -d postgres
 pnpm db:push
 pnpm db:generate
 ```
@@ -51,7 +51,7 @@ pnpm db:generate
 ## 文档索引
 
 - [架构设计](./docs/architecture.md)
-- [PM2 与 CI/CD 部署](./docs/pm2-cicd.md)
+- [Docker 与 CI/CD 部署](./docs/docker-cicd.md)
 - [站点配置说明](./docs/site-settings.md)
 - [开发路线](./docs/roadmap.md)
 - [RSS 与 SEO 实现规划](./docs/rss-seo-plan.md)
