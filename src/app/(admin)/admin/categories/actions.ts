@@ -1,151 +1,100 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireAdmin } from "@/server/auth";
 import {
   createCategory,
-  deleteCategoryById,
   updateCategoryById,
-} from "@/server/repositories/categories";
-import { requireAdminSession } from "@/server/auth";
+  deleteCategoryById,
+} from "@/server/supabase/categories";
+import type { CategoryOption } from "@/types/domain";
 
-export type SaveCategoryEditorState = {
+export type CategoryFormState = {
   error: string | null;
-  redirectTo: string | null;
-  createdCategory: Awaited<ReturnType<typeof createCategory>> | null;
+  createdCategory: CategoryOption | null;
 };
 
-export async function saveCategoryAction(
-  _previousState: SaveCategoryEditorState,
-  formData: FormData,
-): Promise<SaveCategoryEditorState> {
-  await requireAdminSession();
-  const id = getRequiredId(formData, "id");
-  const name = getRequiredString(formData, "name");
-  const slug = normalizeSlug(getRequiredString(formData, "slug"));
-  const description = getOptionalString(formData, "description");
-
-  try {
-    const category = await updateCategoryById({
-      id,
-      name,
-      slug,
-      description,
-    });
-
-    revalidateCategorySurfaces(category.id, category.slug);
-  } catch (error) {
-    if (isUniqueSlugError(error)) {
-      return {
-        error: "这个 slug 已经被占用了，请换一个。",
-        redirectTo: null,
-        createdCategory: null,
-      };
-    }
-
-    return {
-      error: error instanceof Error ? error.message : "保存分类时出错了。",
-      redirectTo: null,
-      createdCategory: null,
-    };
-  }
-
-  return {
-    error: null,
-    redirectTo: "/admin/workbench?tab=categories",
-    createdCategory: null,
-  };
-}
-
 export async function createCategoryAction(
-  _previousState: SaveCategoryEditorState,
+  _previousState: CategoryFormState,
   formData: FormData,
-): Promise<SaveCategoryEditorState> {
-  await requireAdminSession();
+): Promise<CategoryFormState> {
+  await requireAdmin();
+
   const name = getRequiredString(formData, "name");
-  const slug = normalizeSlug(getRequiredString(formData, "slug"));
+  const slug = getRequiredString(formData, "slug");
   const description = getOptionalString(formData, "description");
   const inlineCreate = getOptionalString(formData, "inlineCreate") === "1";
 
   try {
-    const category = await createCategory({
-      name,
-      slug,
-      description,
-    });
+    const category = await createCategory({ name, slug: normalizeSlug(slug), description });
 
-    revalidateCategorySurfaces(category.id, category.slug);
+    revalidateCategorySurface();
 
     if (inlineCreate) {
-      return {
-        error: null,
-        redirectTo: null,
-        createdCategory: category,
-      };
+      return { error: null, createdCategory: category };
     }
   } catch (error) {
-    if (isUniqueSlugError(error)) {
-      return {
-        error: "这个 slug 已经被占用了，请换一个。",
-        redirectTo: null,
-        createdCategory: null,
-      };
+    if (isUniqueConstraintError(error)) {
+      return { error: "这个 slug 已经被占用了，请换一个。", createdCategory: null };
     }
 
-    return {
-      error: error instanceof Error ? error.message : "创建分类时出错了。",
-      redirectTo: null,
-      createdCategory: null,
-    };
+    return { error: error instanceof Error ? error.message : "创建分类时出错了。", createdCategory: null };
   }
 
-  return {
-    error: null,
-    redirectTo: "/admin/workbench?tab=categories",
-    createdCategory: null,
-  };
+  redirect("/admin/workbench?tab=categories");
+}
+
+export async function updateCategoryAction(
+  _previousState: CategoryFormState,
+  formData: FormData,
+): Promise<CategoryFormState> {
+  await requireAdmin();
+
+  const id = getRequiredString(formData, "id");
+  const name = getRequiredString(formData, "name");
+  const slug = getRequiredString(formData, "slug");
+  const description = getOptionalString(formData, "description");
+
+  try {
+    await updateCategoryById({ id, name, slug: normalizeSlug(slug), description });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      return { error: "这个 slug 已经被占用了，请换一个。", createdCategory: null };
+    }
+
+    return { error: error instanceof Error ? error.message : "更新分类时出错了。", createdCategory: null };
+  }
+
+  revalidateCategorySurface();
+  redirect("/admin/workbench?tab=categories");
 }
 
 export async function deleteCategoryAction(formData: FormData) {
-  await requireAdminSession();
-  const id = getRequiredId(formData, "id");
-  const category = await deleteCategoryById(id);
+  await requireAdmin();
 
-  revalidateCategorySurfaces(category.id, category.slug);
-  redirect(`/admin/workbench?tab=categories&deletedCategory=${encodeURIComponent(category.id)}`);
-}
+  const id = getRequiredString(formData, "id");
 
-function revalidateCategorySurfaces(id: number, slug: string) {
-  revalidatePath("/admin");
-  revalidatePath("/admin/workbench");
-  revalidatePath(`/admin/categories/${id}`);
-  revalidatePath("/");
-  revalidatePath("/posts");
-  revalidatePath("/timeline");
-  revalidatePath("/rss.xml");
-  revalidatePath("/sitemap.xml");
-  revalidatePath(`/posts?category=${encodeURIComponent(slug)}`);
+  try {
+    await deleteCategoryById(id);
+  } catch (error) {
+    throw new Error(
+      error instanceof Error ? error.message : "删除分类时出错了。",
+    );
+  }
+
+  revalidateCategorySurface();
+  redirect("/admin/workbench?tab=categories");
 }
 
 function getRequiredString(formData: FormData, key: string) {
-  const value = formData.get(key);
+  const value = getOptionalString(formData, key);
 
-  if (typeof value !== "string" || !value.trim()) {
+  if (!value) {
     throw new Error(`请填写 ${key}。`);
   }
 
-  return value.trim();
-}
-
-function getRequiredId(formData: FormData, key: string) {
-  const value = getRequiredString(formData, key);
-
-  if (!/^\d+$/.test(value)) {
-    throw new Error(`请填写有效的编号。`);
-  }
-
-  return Number(value);
+  return value;
 }
 
 function getOptionalString(formData: FormData, key: string) {
@@ -174,9 +123,19 @@ function normalizeSlug(value: string) {
   return slug;
 }
 
-function isUniqueSlugError(error: unknown) {
+function isUniqueConstraintError(error: unknown) {
   return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
+    error instanceof Error &&
+    "code" in error &&
+    (error as any).code === "23505"
   );
+}
+
+function revalidateCategorySurface() {
+  revalidatePath("/admin");
+  revalidatePath("/admin/workbench");
+  revalidatePath("/");
+  revalidatePath("/posts");
+  revalidatePath("/rss.xml");
+  revalidatePath("/sitemap.xml");
 }

@@ -1,7 +1,7 @@
 import { AdminPageHeader } from "@/app/(admin)/admin/ui";
 import { UpdateEditorForm } from "@/app/(admin)/admin/compose/update/update-editor-form";
-import { getUpdateByIdForAdmin } from "@/server/repositories/updates";
-import { getSiteSettings } from "@/server/repositories/site";
+import { getUpdateByIdForAdmin } from "@/server/supabase/updates";
+import { getSiteSettings } from "@/server/supabase/site";
 import { siteConfig } from "@/lib/site";
 
 type AdminComposeUpdatePageProps = {
@@ -14,7 +14,7 @@ export default async function AdminComposeUpdatePage({
   searchParams,
 }: AdminComposeUpdatePageProps) {
   const { id } = await searchParams;
-  const updateId = getUpdateId(id);
+  const updateId = id || null;
   const [update, siteSettings] = await Promise.all([
     updateId ? getUpdateByIdForAdmin(updateId) : Promise.resolve(null),
     getSiteSettings(),
@@ -25,22 +25,10 @@ export default async function AdminComposeUpdatePage({
       <AdminPageHeader eyebrow="Update" title={update ? "编辑动态" : "撰写新动态"} />
 
       <UpdateEditorForm
-        key={update ? `${update.id}:${update.draftSnapshot?.savedAt ?? update.updatedAt}` : "new-update"}
+        key={update ? `${update.id}:${update.updatedAt}` : "new-update"}
         update={update}
         authorName={siteSettings?.authorName ?? siteConfig.author}
       />
     </div>
   );
-}
-
-function getUpdateId(value?: string) {
-  if (!value) {
-    return null;
-  }
-
-  if (!/^\d+$/.test(value)) {
-    return null;
-  }
-
-  return Number(value);
 }

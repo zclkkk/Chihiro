@@ -8,9 +8,9 @@ import {
   getRecentItems,
   getSiteRuntimeDays,
 } from "@/app/(admin)/admin/utils";
-import { listPostsForAdmin } from "@/server/repositories/posts";
-import { getSiteCreatedAt } from "@/server/repositories/site";
-import { listUpdatesForAdmin } from "@/server/repositories/updates";
+import { listPostsForAdmin } from "@/server/supabase/posts";
+import { getSiteCreatedAt } from "@/server/supabase/site";
+import { listUpdatesForAdmin } from "@/server/supabase/updates";
 
 export default async function AdminOverviewPage() {
   const [posts, updates, siteCreatedAt] = await Promise.all([

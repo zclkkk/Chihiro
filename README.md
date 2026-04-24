@@ -18,9 +18,8 @@
 - TypeScript
 - Tailwind CSS 4
 - App Router
-- Postgres
-- Prisma
-- S3 / R2 类对象存储
+- Supabase（Postgres + Auth + Storage）
+- Tiptap 富文本编辑器
 
 ## 本地启动
 
@@ -35,17 +34,46 @@ npm run dev
 http://localhost:3000
 ```
 
-## 本地数据库
+## Supabase 配置
 
-项目已经接入 `Prisma`，本地开发需要先准备一个可用的 PostgreSQL 数据库，并在 `.env` 中设置 `DATABASE_URL`：
-  
+项目使用 Supabase 作为数据库、认证和存储后端。本地开发需要先准备一个 Supabase 项目。
+
+### 1. 创建 Supabase 项目
+
+在 [Supabase Dashboard](https://supabase.com/dashboard) 中创建一个新项目。
+
+### 2. 配置环境变量
+
+复制 `.env.example` 为 `.env`，填入 Supabase 项目的凭据：
+
 ```bash
-DATABASE_URL="postgresql://username:password@127.0.0.1:5432/chihiro?schema=public"
-npm run db:push
-npm run db:generate
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-完成后即可启动开发服务器。
+这些值可以在 Supabase Dashboard → Project Settings → API 中找到。
+
+### 3. 执行数据库迁移
+
+将 `supabase/migrations/` 下的 SQL 文件按顺序在 Supabase Dashboard 的 SQL Editor 中执行：
+
+1. `20260425000000_initial_schema.sql` — 核心表结构与索引
+2. `20260425000001_rls_policies.sql` — RLS 策略
+3. `20260425000002_storage_bucket.sql` — 存储桶与策略
+4. `20260425000003_rpcs.sql` — RPC 函数
+
+### 4. 生成数据库类型（可选）
+
+如果需要重新生成 TypeScript 数据库类型：
+
+```bash
+SUPABASE_PROJECT_ID=your-project-id npm run db:types
+```
+
+### 5. 首次安装
+
+启动开发服务器后访问 `http://localhost:3000/install`，按引导创建管理员账号并初始化站点配置。
 
 ## 文档索引
 

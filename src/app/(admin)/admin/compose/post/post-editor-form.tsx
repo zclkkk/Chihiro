@@ -1,6 +1,6 @@
 "use client";
 
-import { ContentStatus } from "@prisma/client";
+import { CONTENT_STATUS, type ContentStatus } from "@/types/domain";
 import { Check } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useActionState, useEffect, useRef, useState } from "react";
@@ -20,9 +20,7 @@ import { escapeHtmlText, stripHtml } from "@/lib/content";
 import { createCategoryAction } from "@/app/(admin)/admin/categories/actions";
 import { createTagAction } from "@/app/(admin)/admin/tags/actions";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
-import type { CategoryOption } from "@/server/repositories/categories";
-import type { TagOption } from "@/server/repositories/tags";
-import type { PostItem } from "@/server/repositories/posts";
+import type { CategoryOption, TagOption, PostItem } from "@/types/domain";
 
 const initialState: SavePostEditorState = {
   error: null,
@@ -52,7 +50,7 @@ export function PostEditorForm({ post, categories, tags, siteUrlBase, authorName
     () => new Set(editablePost?.tags.map((tag) => tag.id) ?? []),
   );
   const [selectedCategoryId, setSelectedCategoryId] = useState(
-    editablePost?.category?.id ? String(editablePost.category.id) : "",
+    editablePost?.category?.id ?? "",
   );
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
@@ -62,11 +60,10 @@ export function PostEditorForm({ post, categories, tags, siteUrlBase, authorName
   const handleCreatedTagRef = useRef<(tag: TagOption) => void>(() => {});
   const formRef = useRef<HTMLFormElement | null>(null);
   const wasDirtyBeforeSubmitRef = useRef(false);
-  const draftSavedAt = getDraftSavedAt(post);
-  const hasSavedRevision = Boolean(post?.status === ContentStatus.PUBLISHED && draftSavedAt);
-  const bottomPrompt = getBottomPrompt(post, draftSavedAt);
+  const hasSavedRevision = Boolean(post?.hasDraftRevision && post.status === CONTENT_STATUS.PUBLISHED);
+  const bottomPrompt = getBottomPrompt(post);
   const selectedCategorySlug =
-    categoryItems.find((category) => String(category.id) === selectedCategoryId)?.slug ??
+    categoryItems.find((category) => category.id === selectedCategoryId)?.slug ??
     "uncategorized";
   const postUrlPrefix = `${siteUrlBase}/posts/${selectedCategorySlug}/`;
 
@@ -90,7 +87,7 @@ export function PostEditorForm({ post, categories, tags, siteUrlBase, authorName
         hiddenFields={
           <>
             <input type="hidden" name="postId" value={post?.id ?? ""} />
-            <input type="hidden" name="currentStatus" value={post?.status ?? ContentStatus.DRAFT} />
+            <input type="hidden" name="currentStatus" value={post?.status ?? CONTENT_STATUS.DRAFT} />
           </>
         }
         stateError={state.error}
@@ -244,7 +241,7 @@ export function PostEditorForm({ post, categories, tags, siteUrlBase, authorName
         footerLeft={
           <>
             <p className="min-w-0 text-xs text-zinc-500 dark:text-zinc-400">{bottomPrompt}</p>
-            {hasSavedRevision ? <DiscardRevisionButton postId={post?.id ?? 0} /> : null}
+            {hasSavedRevision && post?.id ? <DiscardRevisionButton postId={post.id} /> : null}
           </>
         }
         footerRight={
@@ -268,7 +265,7 @@ export function PostEditorForm({ post, categories, tags, siteUrlBase, authorName
               dedupeById([...current.filter((item) => item.id !== category.id), category]),
             ),
           );
-          setSelectedCategoryId(String(category.id));
+          setSelectedCategoryId(category.id);
         }}
         onCreatedRef={handleCreatedCategoryRef}
       />
@@ -306,16 +303,16 @@ export function PostEditorForm({ post, categories, tags, siteUrlBase, authorName
   );
 }
 
-function getBottomPrompt(post: PostItem | null, draftSavedAt: string | null) {
+function getBottomPrompt(post: PostItem | null) {
   if (!post) {
     return "当前是新撰写。可以先保存为草稿，也可以直接发布。";
   }
 
-  if (draftSavedAt) {
-    return `当前正在编辑 ${formatAdminDateTime(draftSavedAt)} 保存的草稿，公开页仍在使用上一个已发布版本。`;
+  if (post.hasDraftRevision && post.status === CONTENT_STATUS.PUBLISHED) {
+    return "当前正在编辑草稿修订，公开页仍在使用上一个已发布版本。";
   }
 
-  if (post.status === ContentStatus.PUBLISHED) {
+  if (post.status === CONTENT_STATUS.PUBLISHED) {
     return "当前是已发布文章。保存会保留草稿，只有点击更新并发布才会更新公开页。";
   }
 
@@ -323,31 +320,7 @@ function getBottomPrompt(post: PostItem | null, draftSavedAt: string | null) {
 }
 
 function getEditablePost(post: PostItem | null) {
-  if (!post?.draftSnapshot) {
-    return post;
-  }
-
-  return {
-    ...post,
-    title: post.draftSnapshot.title,
-    slug: post.draftSnapshot.slug,
-    summary: post.draftSnapshot.summary,
-    content: post.draftSnapshot.content,
-    contentHtml: post.draftSnapshot.contentHtml,
-    authorName: post.draftSnapshot.authorName,
-    publishedAt: post.draftSnapshot.publishedAt,
-    category: post.draftSnapshot.category,
-    coverAsset: post.draftSnapshot.coverAsset,
-    tags: post.draftSnapshot.tags,
-  };
-}
-
-function getDraftSavedAt(post: PostItem | null) {
-  if (!post?.draftSnapshot) {
-    return null;
-  }
-
-  return post.draftSnapshot.savedAt ?? null;
+  return post;
 }
 
 function buildPostPreviewState(
@@ -372,7 +345,7 @@ function buildPostPreviewState(
       .map((value) => value.trim())
       .filter(Boolean),
   );
-  const category = categories.find((item) => String(item.id) === categoryId);
+  const category = categories.find((item) => item.id === categoryId);
   const selectedTags = tags.filter((tag) => selectedTagIds.has(tag.id));
   const publishedAt = getFormValue(formData, "publishedAt");
   const categoryLabel = category?.name ? escapeHtmlText(category.name) : "未分类";
@@ -457,7 +430,7 @@ function PublishButton({ hasExistingPost }: { hasExistingPost: boolean }) {
   );
 }
 
-function DiscardRevisionButton({ postId }: { postId: number }) {
+function DiscardRevisionButton({ postId }: { postId: string }) {
   return (
     <ConfirmActionDialog
       triggerLabel="删除修订"
@@ -486,7 +459,6 @@ function InlineCreateCategoryDialog({
   const formRef = useRef<HTMLFormElement | null>(null);
   const [state, formAction] = useActionState(createCategoryAction, {
     error: null,
-    redirectTo: null,
     createdCategory: null,
   });
 
@@ -495,14 +467,11 @@ function InlineCreateCategoryDialog({
   }, [onCreated, onCreatedRef]);
 
   useEffect(() => {
-    if (!state.createdCategory) {
-      return;
+    if (state.createdCategory) {
+      onCreatedRef.current(state.createdCategory);
+      onOpenChange(false);
     }
-
-    onCreatedRef.current(state.createdCategory);
-    onOpenChange(false);
-    formRef.current?.reset();
-  }, [onCreatedRef, onOpenChange, state.createdCategory]);
+  }, [state.createdCategory, onCreatedRef, onOpenChange]);
 
   if (!open || typeof document === "undefined") {
     return null;
@@ -615,7 +584,6 @@ function InlineCreateTagDialog({
   const formRef = useRef<HTMLFormElement | null>(null);
   const [state, formAction] = useActionState(createTagAction, {
     error: null,
-    redirectTo: null,
     createdTag: null,
   });
 
@@ -624,14 +592,11 @@ function InlineCreateTagDialog({
   }, [onCreated, onCreatedRef]);
 
   useEffect(() => {
-    if (!state.createdTag) {
-      return;
+    if (state.createdTag) {
+      onCreatedRef.current(state.createdTag);
+      onOpenChange(false);
     }
-
-    onCreatedRef.current(state.createdTag);
-    onOpenChange(false);
-    formRef.current?.reset();
-  }, [onCreatedRef, onOpenChange, state.createdTag]);
+  }, [state.createdTag, onCreatedRef, onOpenChange]);
 
   if (!open || typeof document === "undefined") {
     return null;
@@ -740,8 +705,8 @@ function sortTags(tags: TagOption[]) {
   return [...tags].sort((left, right) => left.name.localeCompare(right.name, "zh-Hans-CN"));
 }
 
-function dedupeById<T extends { id: string | number }>(items: T[]) {
-  const seen = new Set<string | number>();
+function dedupeById<T extends { id: string }>(items: T[]) {
+  const seen = new Set<string>();
 
   return items.filter((item) => {
     if (seen.has(item.id)) {

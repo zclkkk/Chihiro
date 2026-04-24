@@ -1,8 +1,9 @@
-import { ContentStatus } from "@prisma/client";
+import { CONTENT_STATUS } from "@/types/domain";
+import type { ContentStatus } from "@/types/domain";
 import { getContentText } from "@/lib/content";
 import { getPostPath } from "@/lib/routes";
-import type { PostItem } from "@/server/repositories/posts";
-import type { UpdateItem } from "@/server/repositories/updates";
+import type { PostItem } from "@/types/domain";
+import type { UpdateItem } from "@/types/domain";
 
 export const ADMIN_NAV_ITEMS = [
   { href: "/admin", label: "概览" },
@@ -100,15 +101,15 @@ export function getSiteRuntimeDays(startedAt: string | null) {
 
 export function getPublishedCount(posts: PostItem[], updates: UpdateItem[]) {
   return (
-    posts.filter((item) => item.status === ContentStatus.PUBLISHED).length +
-    updates.filter((item) => item.status === ContentStatus.PUBLISHED).length
+    posts.filter((item) => item.status === CONTENT_STATUS.PUBLISHED).length +
+    updates.filter((item) => item.status === CONTENT_STATUS.PUBLISHED).length
   );
 }
 
 export function getDraftCount(posts: PostItem[], updates: UpdateItem[]) {
   return (
-    posts.filter((item) => item.status === ContentStatus.DRAFT).length +
-    updates.filter((item) => item.status === ContentStatus.DRAFT).length
+    posts.filter((item) => item.status === CONTENT_STATUS.DRAFT).length +
+    updates.filter((item) => item.status === CONTENT_STATUS.DRAFT).length
   );
 }
 
@@ -138,13 +139,13 @@ export function getRecentItems(posts: PostItem[], updates: UpdateItem[]) {
 
 export function getDraftPosts(posts: PostItem[]) {
   return posts
-    .filter((item) => item.status === ContentStatus.DRAFT)
+    .filter((item) => item.status === CONTENT_STATUS.DRAFT)
     .sort((left, right) => compareAdminDates(right.updatedAt, left.updatedAt));
 }
 
 export function getDraftUpdates(updates: UpdateItem[]) {
   return updates
-    .filter((item) => item.status === ContentStatus.DRAFT)
+    .filter((item) => item.status === CONTENT_STATUS.DRAFT)
     .sort((left, right) => compareAdminDates(right.updatedAt, left.updatedAt));
 }
 

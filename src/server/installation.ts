@@ -1,18 +1,10 @@
 import "server-only";
 
-import { hasDatabaseUrl } from "@/server/db/client";
-import {
-  isDatabaseSchemaMissingError,
-  isDatabaseUnavailableError,
-} from "@/server/database-errors";
-import { countAdminUsers } from "@/server/repositories/admin-auth";
-import { getSiteSettings } from "@/server/repositories/site";
+import { createClient as createAdminClient } from "@/lib/supabase/admin";
+import { hasSupabaseEnv } from "@/lib/supabase/env";
+import { getSiteSettings } from "@/server/supabase/site";
 
-export type InstallationStatus =
-  | "missing_database"
-  | "database_unavailable"
-  | "schema_missing"
-  | "ready";
+export type InstallationStatus = "needs_installation" | "ready";
 
 export type InstallationState = {
   installed: boolean;
@@ -22,48 +14,39 @@ export type InstallationState = {
 };
 
 export async function getInstallationState(): Promise<InstallationState> {
-  if (!hasDatabaseUrl()) {
+  if (!hasSupabaseEnv()) {
     return {
       installed: false,
-      status: "missing_database",
+      status: "needs_installation",
       adminUserCount: 0,
       hasSiteSettings: false,
     };
   }
 
   try {
-    const [adminUserCount, siteSettings] = await Promise.all([
-      countAdminUsers(),
+    const adminSupabase = createAdminClient();
+
+    const [adminResult, settings] = await Promise.all([
+      adminSupabase.from("admin_profiles").select("id", { count: "exact", head: true }),
       getSiteSettings(),
     ]);
-    const hasSiteSettings = Boolean(siteSettings);
+
+    const adminUserCount = adminResult.count ?? 0;
+    const hasSiteSettings = Boolean(settings);
 
     return {
       installed: adminUserCount > 0 && hasSiteSettings,
-      status: "ready",
+      status: adminUserCount > 0 && hasSiteSettings ? "ready" : "needs_installation",
       adminUserCount,
       hasSiteSettings,
     };
-  } catch (error) {
-    if (isDatabaseSchemaMissingError(error)) {
-      return {
-        installed: false,
-        status: "schema_missing",
-        adminUserCount: 0,
-        hasSiteSettings: false,
-      };
-    }
-
-    if (isDatabaseUnavailableError(error)) {
-      return {
-        installed: false,
-        status: "database_unavailable",
-        adminUserCount: 0,
-        hasSiteSettings: false,
-      };
-    }
-
-    throw error;
+  } catch {
+    return {
+      installed: false,
+      status: "needs_installation",
+      adminUserCount: 0,
+      hasSiteSettings: false,
+    };
   }
 }
 

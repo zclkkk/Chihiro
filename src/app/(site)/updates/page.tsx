@@ -74,7 +74,7 @@ async function UpdatesPageContent({
     (safeCurrentPage - 1) * UPDATES_PER_PAGE,
     safeCurrentPage * UPDATES_PER_PAGE,
   );
-  const updatePageById = new Map<number, number>();
+  const updatePageById = new Map<string, number>();
 
   sortedUpdates.forEach((item, index) => {
     updatePageById.set(item.id, Math.floor(index / UPDATES_PER_PAGE) + 1);

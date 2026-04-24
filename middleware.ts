@@ -1,36 +1,41 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
+import { type NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(request: NextRequest) {
-  const { pathname, search } = request.nextUrl;
-  const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+  let supabaseResponse = NextResponse.next({
+    request,
+  });
 
-  if (pathname === "/admin/login") {
-    return redirectToSiteLogin(request, "/admin");
-  }
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet: { name: string; value: string; options: Record<string, unknown> }[]) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value),
+          );
+          supabaseResponse = NextResponse.next({
+            request,
+          });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options),
+          );
+        },
+      },
+    },
+  );
 
-  if (sessionToken) {
-    return NextResponse.next();
-  }
+  await supabase.auth.getUser();
 
-  return redirectToSiteLogin(request, `${pathname}${search}`);
+  return supabaseResponse;
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
-
-function getSafeAdminPath(value: string | null) {
-  if (!value || !value.startsWith("/admin")) {
-    return null;
-  }
-
-  return value;
-}
-
-function redirectToSiteLogin(request: NextRequest, next: string) {
-  const target = new URL("/", request.url);
-  target.searchParams.set("admin-login", "1");
-  target.searchParams.set("next", getSafeAdminPath(next) ?? "/admin");
-  return NextResponse.redirect(target);
-}

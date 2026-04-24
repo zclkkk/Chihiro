@@ -363,7 +363,6 @@ export const handleImageUpload = async (
   onProgress?: (event: { progress: number }) => void,
   abortSignal?: AbortSignal
 ): Promise<string> => {
-  // Validate file
   if (!file) {
     throw new Error("No file provided")
   }
@@ -374,17 +373,22 @@ export const handleImageUpload = async (
     )
   }
 
-  // For demo/testing: Simulate upload progress. In production, replace the following code
-  // with your own upload implementation.
-  for (let progress = 0; progress <= 100; progress += 10) {
-    if (abortSignal?.aborted) {
-      throw new Error("Upload cancelled")
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    onProgress?.({ progress })
+  if (abortSignal?.aborted) {
+    throw new Error("Upload cancelled")
   }
 
-  return "/images/tiptap-ui-placeholder-image.jpg"
+  const { uploadToSiteAssets } = await import("@/lib/supabase/upload");
+
+  const supabase = (await import("@/lib/supabase/browser")).createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be logged in to upload images.");
+  }
+
+  const result = await uploadToSiteAssets(file, user.id, onProgress);
+
+  return result.publicUrl;
 }
 
 type ProtocolOptions = {

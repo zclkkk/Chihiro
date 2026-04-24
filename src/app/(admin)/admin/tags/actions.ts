@@ -1,157 +1,98 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireAdmin } from "@/server/auth";
 import {
   createTag,
-  deleteTagById,
-  getTagByIdForAdmin,
   updateTagById,
-} from "@/server/repositories/tags";
-import { requireAdminSession } from "@/server/auth";
-import type { TagItem } from "@/server/repositories/tags";
+  deleteTagById,
+} from "@/server/supabase/tags";
+import type { TagOption } from "@/types/domain";
 
-export type SaveTagEditorState = {
+export type TagFormState = {
   error: string | null;
-  redirectTo: string | null;
-  createdTag: TagItem | null;
+  createdTag: TagOption | null;
 };
 
 export async function createTagAction(
-  _previousState: SaveTagEditorState,
+  _previousState: TagFormState,
   formData: FormData,
-): Promise<SaveTagEditorState> {
-  await requireAdminSession();
+): Promise<TagFormState> {
+  await requireAdmin();
+
   const name = getRequiredString(formData, "name");
-  const slug = normalizeSlug(getRequiredString(formData, "slug"));
+  const slug = getRequiredString(formData, "slug");
   const inlineCreate = getOptionalString(formData, "inlineCreate") === "1";
 
   try {
-    const tag = await createTag({
-      name,
-      slug,
-    });
+    const tag = await createTag({ name, slug: normalizeSlug(slug) });
 
-    revalidateTagSurfaces(tag.id, tag.slug);
+    revalidateTagSurface();
 
     if (inlineCreate) {
-      return {
-        error: null,
-        redirectTo: null,
-        createdTag: tag,
-      };
+      return { error: null, createdTag: tag };
     }
   } catch (error) {
-    if (isUniqueSlugError(error)) {
-      return {
-        error: "这个 slug 已经被占用了，请换一个。",
-        redirectTo: null,
-        createdTag: null,
-      };
+    if (isUniqueConstraintError(error)) {
+      return { error: "这个 slug 已经被占用了，请换一个。", createdTag: null };
     }
 
-    return {
-      error: error instanceof Error ? error.message : "创建标签时出错了。",
-      redirectTo: null,
-      createdTag: null,
-    };
+    return { error: error instanceof Error ? error.message : "创建标签时出错了。", createdTag: null };
   }
 
-  return {
-    error: null,
-    redirectTo: "/admin/workbench?tab=tags",
-    createdTag: null,
-  };
-}
-
-export async function saveTagAction(
-  _previousState: SaveTagEditorState,
-  formData: FormData,
-): Promise<SaveTagEditorState> {
-  await requireAdminSession();
-  const id = getRequiredString(formData, "id");
-  const name = getRequiredString(formData, "name");
-  const slug = normalizeSlug(getRequiredString(formData, "slug"));
-
-  try {
-    const currentTag = await getTagByIdForAdmin(id);
-    if (!currentTag) {
-      return {
-        error: "标签不存在。",
-        redirectTo: null,
-        createdTag: null,
-      };
-    }
-
-    const tag = await updateTagById({
-      id,
-      name,
-      slug,
-    });
-
-    revalidateTagSurfaces(currentTag.id, currentTag.slug);
-    revalidateTagSurfaces(tag.id, tag.slug);
-  } catch (error) {
-    if (isUniqueSlugError(error)) {
-      return {
-        error: "这个 slug 已经被占用了，请换一个。",
-        redirectTo: null,
-        createdTag: null,
-      };
-    }
-
-    return {
-      error: error instanceof Error ? error.message : "保存标签时出错了。",
-      redirectTo: null,
-      createdTag: null,
-    };
-  }
-
-  return {
-    error: null,
-    redirectTo: "/admin/workbench?tab=tags",
-    createdTag: null,
-  };
-}
-
-export async function deleteTagAction(formData: FormData) {
-  await requireAdminSession();
-  const id = getRequiredString(formData, "id");
-  const currentTag = await getTagByIdForAdmin(id);
-
-  if (!currentTag) {
-    throw new Error("标签不存在。");
-  }
-
-  const tag = await deleteTagById(id);
-
-  revalidateTagSurfaces(currentTag.id, currentTag.slug);
-  revalidateTagSurfaces(tag.id, tag.slug);
   redirect("/admin/workbench?tab=tags");
 }
 
-function revalidateTagSurfaces(id: string, slug: string) {
-  revalidatePath("/admin");
-  revalidatePath("/admin/workbench");
-  revalidatePath(`/admin/tags/${id}`);
-  revalidatePath("/");
-  revalidatePath("/posts");
-  revalidatePath("/updates");
-  revalidatePath("/timeline");
-  revalidatePath("/rss.xml");
-  revalidatePath("/sitemap.xml");
-  revalidatePath(`/posts?tag=${encodeURIComponent(slug)}`);
+export async function updateTagAction(
+  _previousState: TagFormState,
+  formData: FormData,
+): Promise<TagFormState> {
+  await requireAdmin();
+
+  const id = getRequiredString(formData, "id");
+  const name = getRequiredString(formData, "name");
+  const slug = getRequiredString(formData, "slug");
+
+  try {
+    await updateTagById({ id, name, slug: normalizeSlug(slug) });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      return { error: "这个 slug 已经被占用了，请换一个。", createdTag: null };
+    }
+
+    return { error: error instanceof Error ? error.message : "更新标签时出错了。", createdTag: null };
+  }
+
+  revalidateTagSurface();
+  redirect("/admin/workbench?tab=tags");
+}
+
+export async function deleteTagAction(formData: FormData) {
+  await requireAdmin();
+
+  const id = getRequiredString(formData, "id");
+
+  try {
+    await deleteTagById(id);
+  } catch (error) {
+    throw new Error(
+      error instanceof Error ? error.message : "删除标签时出错了。",
+    );
+  }
+
+  revalidateTagSurface();
+  redirect("/admin/workbench?tab=tags");
 }
 
 function getRequiredString(formData: FormData, key: string) {
-  const value = formData.get(key);
+  const value = getOptionalString(formData, key);
 
-  if (typeof value !== "string" || !value.trim()) {
+  if (!value) {
     throw new Error(`请填写 ${key}。`);
   }
 
-  return value.trim();
+  return value;
 }
 
 function getOptionalString(formData: FormData, key: string) {
@@ -180,9 +121,19 @@ function normalizeSlug(value: string) {
   return slug;
 }
 
-function isUniqueSlugError(error: unknown) {
+function isUniqueConstraintError(error: unknown) {
   return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
+    error instanceof Error &&
+    "code" in error &&
+    (error as any).code === "23505"
   );
+}
+
+function revalidateTagSurface() {
+  revalidatePath("/admin");
+  revalidatePath("/admin/workbench");
+  revalidatePath("/");
+  revalidatePath("/posts");
+  revalidatePath("/rss.xml");
+  revalidatePath("/sitemap.xml");
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { isSiteUrlLockedByEnv, resolveCanonicalSiteUrl, siteConfig } from "@/lib/site";
 import { AdminPageHeader } from "@/app/(admin)/admin/ui";
 import { GeneralSettingsForm } from "@/app/(admin)/admin/settings/general/general-settings-form";
-import { getSiteSettings } from "@/server/repositories/site";
+import { getSiteSettings } from "@/server/supabase/site";
 
 export default async function AdminGeneralSettingsPage() {
   const siteSettings = await getSiteSettings();

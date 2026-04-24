@@ -1,8 +1,8 @@
-import { ContentStatus } from "@prisma/client";
+import type { ContentStatus } from "@/types/domain";
 import type { ReactNode } from "react";
 import { formatAdminDate } from "@/app/(admin)/admin/utils";
-import type { PostItem } from "@/server/repositories/posts";
-import type { UpdateItem } from "@/server/repositories/updates";
+import type { PostItem } from "@/types/domain";
+import type { UpdateItem } from "@/types/domain";
 
 export function AdminPageHeader({
   eyebrow,
@@ -73,9 +73,9 @@ export function StatCard({
 
 export function StatusBadge({ status }: { status: ContentStatus }) {
   const className =
-    status === ContentStatus.PUBLISHED
+    status === "published"
       ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/25 dark:text-emerald-300"
-      : status === ContentStatus.DRAFT
+      : status === "draft"
         ? "bg-amber-50 text-amber-700 dark:bg-amber-950/25 dark:text-amber-300"
         : "bg-zinc-100 text-zinc-600 dark:bg-zinc-900/60 dark:text-zinc-400";
 
@@ -162,9 +162,9 @@ export function ContentListPanel<T extends PostItem | UpdateItem>({
                     <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
                       {item.title}
                     </h3>
-                    {"draftSnapshot" in item &&
-                      item.status === ContentStatus.PUBLISHED &&
-                      item.draftSnapshot ? (
+                    {"hasDraftRevision" in item &&
+                      item.status === "published" &&
+                      item.hasDraftRevision ? (
                         <span className="inline-flex items-center border border-amber-200/80 bg-amber-50/80 px-2 py-0.5 text-[0.68rem] font-medium text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/20 dark:text-amber-300">
                           有修订
                         </span>

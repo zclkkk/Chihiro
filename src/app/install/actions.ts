@@ -1,19 +1,12 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { siteConfig } from "@/lib/site";
-import {
-  MIN_ADMIN_PASSWORD_LENGTH,
-  MIN_ADMIN_USERNAME_LENGTH,
-  normalizeAdminUsername,
-} from "@/lib/admin-auth";
-import { createAdminSessionForUser } from "@/server/auth";
-import { isDatabaseUnavailableError } from "@/server/database-errors";
+import { createClient as createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createServerClient } from "@/lib/supabase/server";
+import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { getInstallationState } from "@/server/installation";
-import { hashPassword } from "@/server/passwords";
-import { createAdminUser, countAdminUsers } from "@/server/repositories/admin-auth";
-import { upsertSiteSettings } from "@/server/repositories/site";
+import { upsertSiteSettings } from "@/server/supabase/site";
+import type { SiteSettingsRecord } from "@/types/domain";
 
 export type InstallActionState = {
   error: string | null;
@@ -23,128 +16,92 @@ export async function initializeSiteAction(
   _previousState: InstallActionState,
   formData: FormData,
 ): Promise<InstallActionState> {
+  if (!hasSupabaseEnv()) {
+    return {
+      error: "还没有配置 Supabase 环境变量，请先配置 NEXT_PUBLIC_SUPABASE_URL 和 NEXT_PUBLIC_SUPABASE_ANON_KEY。",
+    };
+  }
+
   const installationState = await getInstallationState();
 
-  if (installationState.status === "missing_database") {
-    return {
-      error: "还没有配置 DATABASE_URL，请先把数据库连接串写入环境变量。",
-    };
+  if (installationState.installed) {
+    redirect("/admin");
   }
 
-  if (installationState.status === "database_unavailable") {
-    return {
-      error: "数据库当前不可用，请先检查连接状态。",
-    };
-  }
-
-  if (installationState.status === "schema_missing") {
-    return {
-      error: "数据库表结构还没有初始化，请先运行 npm run db:push。",
-    };
-  }
-
+  const email = getRequiredString(formData, "email");
+  const password = getRequiredString(formData, "password");
+  const confirmPassword = getRequiredString(formData, "confirmPassword");
   const siteName = getRequiredString(formData, "siteName");
-  const siteDescription = getRequiredString(formData, "siteDescription");
-  const siteUrl = getValidatedUrl(getRequiredString(formData, "siteUrl"));
-  const locale = getOptionalString(formData, "locale") || siteConfig.locale;
-  const authorName = getRequiredString(formData, "authorName");
-  const authorAvatarUrl = getOptionalUrl(formData, "authorAvatarUrl");
-  const heroIntro = getOptionalString(formData, "heroIntro");
-  const summary = getOptionalString(formData, "summary");
-  const motto = getOptionalString(formData, "motto");
-  const email = getOptionalString(formData, "email");
-  const githubUrl = getOptionalUrl(formData, "githubUrl");
+  const siteDescription = getOptionalString(formData, "siteDescription") ?? "";
+  const siteUrl = getRequiredString(formData, "siteUrl");
+  const authorName = getOptionalString(formData, "authorName") ?? "Admin";
 
-  if (!siteName) {
+  if (password !== confirmPassword) {
     return {
-      error: "请填写站点名称。",
+      error: "两次输入的密码不一致。",
     };
   }
 
-  if (!authorName) {
+  if (password.length < 8) {
     return {
-      error: "请填写作者名称。",
+      error: "密码长度至少为 8 位。",
     };
   }
-
-  if (!siteDescription) {
-    return {
-      error: "请填写站点简介。",
-    };
-  }
-
-  if (!siteUrl) {
-    return {
-      error: "请填写有效的站点地址。",
-    };
-  }
-
-  let createdAdminId: string | null = null;
 
   try {
-    const adminUserCount = await countAdminUsers();
+    const adminSupabase = createAdminClient();
 
-    if (adminUserCount === 0) {
-      const username = normalizeAdminUsername(getRequiredString(formData, "adminUsername"));
-      const password = getRequiredString(formData, "adminPassword");
+    const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
 
-      if (username.length < MIN_ADMIN_USERNAME_LENGTH) {
-        return {
-          error: `管理员帐号至少需要 ${MIN_ADMIN_USERNAME_LENGTH} 个字符。`,
-        };
-      }
-
-      if (password.length < MIN_ADMIN_PASSWORD_LENGTH) {
-        return {
-          error: `管理员密码至少需要 ${MIN_ADMIN_PASSWORD_LENGTH} 个字符。`,
-        };
-      }
-
-      const admin = await createAdminUser(username, await hashPassword(password));
-      createdAdminId = admin.id;
+    if (authError) {
+      return {
+        error: `创建管理员账号失败：${authError.message}`,
+      };
     }
 
-    await upsertSiteSettings({
+    const userId = authData.user.id;
+
+    const { error: profileError } = await adminSupabase
+      .from("admin_profiles")
+      .insert({ id: userId });
+
+    if (profileError) {
+      return {
+        error: `创建管理员档案失败：${profileError.message}`,
+      };
+    }
+
+    const settings: SiteSettingsRecord = {
       siteName,
       siteDescription,
       siteUrl,
-      locale,
+      locale: "zh-CN",
       authorName,
-      authorAvatarUrl,
-      heroIntro,
-      summary,
-      motto,
+      authorAvatarUrl: null,
+      heroIntro: null,
+      summary: null,
+      motto: null,
+      email: null,
+      githubUrl: null,
+    };
+
+    await upsertSiteSettings(settings, adminSupabase);
+
+    const supabase = await createServerClient();
+    await supabase.auth.signInWithPassword({
       email,
-      githubUrl,
+      password,
     });
   } catch (error) {
-    if (isDatabaseUnavailableError(error)) {
-      return {
-        error: "数据库当前不可用，请先恢复数据库后再初始化。",
-      };
-    }
-
-    const code = typeof error === "object" && error ? Reflect.get(error, "code") : null;
-    if (code === "P2002") {
-      return {
-        error: "管理员帐号已存在，请换一个用户名，或者直接登录后台。",
-      };
-    }
-
-    throw error;
+    return {
+      error: error instanceof Error ? error.message : "初始化站点时出错了。",
+    };
   }
 
-  if (createdAdminId) {
-    await createAdminSessionForUser(createdAdminId);
-  }
-
-  revalidatePath("/");
-  revalidatePath("/posts");
-  revalidatePath("/updates");
-  revalidatePath("/timeline");
-  revalidatePath("/rss.xml");
-  revalidatePath("/sitemap.xml");
-  revalidatePath("/admin");
   redirect("/admin");
 }
 
@@ -152,7 +109,7 @@ function getRequiredString(formData: FormData, key: string) {
   const value = formData.get(key);
 
   if (typeof value !== "string" || !value.trim()) {
-    return "";
+    throw new Error(`请填写 ${key}。`);
   }
 
   return value.trim();
@@ -167,26 +124,4 @@ function getOptionalString(formData: FormData, key: string) {
 
   const normalized = value.trim();
   return normalized ? normalized : null;
-}
-
-function getValidatedUrl(value: string) {
-  try {
-    return new URL(value).toString().replace(/\/$/, "");
-  } catch {
-    return "";
-  }
-}
-
-function getOptionalUrl(formData: FormData, key: string) {
-  const value = getOptionalString(formData, key);
-
-  if (!value) {
-    return null;
-  }
-
-  try {
-    return new URL(value).toString().replace(/\/$/, "");
-  } catch {
-    return null;
-  }
 }

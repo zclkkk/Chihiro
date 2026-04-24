@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { CategoryEditorForm } from "@/app/(admin)/admin/categories/[id]/category-editor-form";
 import { AdminPageHeader } from "@/app/(admin)/admin/ui";
-import { getCategoryByIdForAdmin } from "@/server/repositories/categories";
+import { getCategoryByIdForAdmin } from "@/server/supabase/categories";
 
 type AdminCategoryPageProps = {
   params: Promise<{
@@ -11,13 +11,8 @@ type AdminCategoryPageProps = {
 
 export default async function AdminCategoryPage({ params }: AdminCategoryPageProps) {
   const { id } = await params;
-  const categoryId = Number(id);
 
-  if (!Number.isInteger(categoryId)) {
-    notFound();
-  }
-
-  const category = await getCategoryByIdForAdmin(categoryId);
+  const category = await getCategoryByIdForAdmin(id);
 
   if (!category) {
     notFound();

@@ -46,7 +46,7 @@ export function getUpdatesPath(input: {
 }
 
 export function getUpdateAnchorPath(input: {
-  updateId: number;
+  updateId: string | number;
   sort?: UpdatesSortValue;
   page?: number;
 }) {

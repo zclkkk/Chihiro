@@ -8,14 +8,13 @@ import { EmptyPanel } from "@/app/(admin)/admin/ui";
 import {
   createTagAction,
   deleteTagAction,
-  saveTagAction,
-  type SaveTagEditorState,
+  updateTagAction,
+  type TagFormState,
 } from "@/app/(admin)/admin/tags/actions";
-import type { TagItem } from "@/server/repositories/tags";
+import type { TagItem } from "@/types/domain";
 
-const initialState: SaveTagEditorState = {
+const initialState: TagFormState = {
   error: null,
-  redirectTo: null,
   createdTag: null,
 };
 
@@ -27,15 +26,15 @@ export function TagEditorForm({ tag }: TagEditorFormProps) {
   const router = useRouter();
   const isCreateMode = !tag;
   const [state, formAction] = useActionState(
-    isCreateMode ? createTagAction : saveTagAction,
+    isCreateMode ? createTagAction : updateTagAction,
     initialState,
   );
 
   useEffect(() => {
-    if (state.redirectTo) {
-      router.replace(state.redirectTo);
+    if (!state.error && !isCreateMode) {
+      router.replace("/admin/workbench?tab=tags");
     }
-  }, [router, state.redirectTo]);
+  }, [router, state.error, isCreateMode]);
 
   return (
     <form action={formAction} className="grid gap-6">

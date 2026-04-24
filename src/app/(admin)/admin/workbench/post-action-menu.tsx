@@ -10,7 +10,7 @@ import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type PostActionMenuProps = {
-  postId: number;
+  postId: string;
   isPublished: boolean;
 };
 

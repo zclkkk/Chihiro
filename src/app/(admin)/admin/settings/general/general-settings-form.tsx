@@ -4,13 +4,13 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { EmptyPanel } from "@/app/(admin)/admin/ui";
 import {
-  saveGeneralSettingsAction,
-  type SaveGeneralSettingsState,
+  saveSettingsAction,
+  type SettingsFormState,
 } from "@/app/(admin)/admin/settings/actions";
 
-const initialState: SaveGeneralSettingsState = {
+const initialState: SettingsFormState = {
   error: null,
-  success: null,
+  success: false,
 };
 
 type GeneralSettingsFormProps = {
@@ -28,7 +28,7 @@ type GeneralSettingsFormProps = {
 };
 
 export function GeneralSettingsForm({ defaults, siteUrlLocked }: GeneralSettingsFormProps) {
-  const [state, formAction] = useActionState(saveGeneralSettingsAction, initialState);
+  const [state, formAction] = useActionState(saveSettingsAction, initialState);
 
   return (
     <form action={formAction} className="grid gap-6">
@@ -166,7 +166,7 @@ export function GeneralSettingsForm({ defaults, siteUrlLocked }: GeneralSettings
         {state.error ? <EmptyPanel text={state.error} /> : null}
         {state.success ? (
           <div className="border border-emerald-200/80 bg-emerald-50/80 px-5 py-4 text-sm text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/20 dark:text-emerald-300">
-            {state.success}
+            设置已保存。
           </div>
         ) : null}
         <div className="sticky bottom-4 z-20 flex items-center justify-between gap-3 rounded-2xl border border-zinc-200/70 bg-white/80 px-4 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:border-zinc-800/70 dark:bg-zinc-950/75 supports-[backdrop-filter]:dark:bg-zinc-950/65">

@@ -1,19 +1,42 @@
 import Link from "next/link";
-import { requireAdminSession } from "@/server/auth";
+import { requireAdmin } from "@/server/auth";
 import { AdminHeader } from "@/app/(admin)/admin/admin-header";
-import { getAdminBackendStatus, getAdminBackendStatusMessage } from "@/server/admin-backend";
+import { getAdminBackendState, type AdminBackendStatus } from "@/server/admin-backend";
 
 export const dynamic = "force-dynamic";
+
+function getAdminBackendStatusMessage(status: AdminBackendStatus) {
+  if (status === "missing_env") {
+    return {
+      title: "Supabase 环境变量未配置",
+      description:
+        "请先配置 NEXT_PUBLIC_SUPABASE_URL、NEXT_PUBLIC_SUPABASE_ANON_KEY 和 SUPABASE_SERVICE_ROLE_KEY 环境变量，然后重启应用。",
+    };
+  }
+
+  if (status === "needs_installation") {
+    return {
+      title: "站点尚未初始化",
+      description:
+        "数据库已连接，但还没有完成站点初始化。请先完成安装向导来创建首个管理员和站点信息。",
+    };
+  }
+
+  return {
+    title: "后台暂时不可用",
+    description: "后台服务暂时不可用，请稍后再试。",
+  };
+}
 
 export default async function AdminLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const backendStatus = await getAdminBackendStatus();
+  const backendState = await getAdminBackendState();
 
-  if (backendStatus !== "ready") {
-    const message = getAdminBackendStatusMessage(backendStatus);
+  if (backendState.status !== "ready") {
+    const message = getAdminBackendStatusMessage(backendState.status);
 
     return (
       <div className="relative min-h-full bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
@@ -36,9 +59,7 @@ export default async function AdminLayout({
               >
                 返回站点
               </Link>
-              {backendStatus === "missing_database" ||
-              backendStatus === "schema_missing" ||
-              backendStatus === "needs_installation" ? (
+              {backendState.status === "needs_installation" ? (
                 <Link
                   href="/install"
                   className="inline-flex h-11 items-center justify-center rounded-2xl border border-zinc-200/80 bg-white px-5 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-950 dark:border-zinc-800/80 dark:bg-zinc-950/80 dark:text-zinc-200 dark:hover:border-zinc-700 dark:hover:text-zinc-50"
@@ -47,7 +68,7 @@ export default async function AdminLayout({
                 </Link>
               ) : null}
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                数据库恢复后，刷新页面即可继续登录后台。
+                配置完成后，刷新页面即可继续登录后台。
               </p>
             </div>
           </section>
@@ -56,7 +77,7 @@ export default async function AdminLayout({
     );
   }
 
-  await requireAdminSession();
+  await requireAdmin();
 
   return (
     <div className="relative min-h-full bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">

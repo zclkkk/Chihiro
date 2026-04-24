@@ -1,18 +1,18 @@
 "use server";
 
-import { ContentStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseStoredRichTextContent } from "@/lib/rich-text-content";
-import { requireAdminSession } from "@/server/auth";
+import { requireAdmin } from "@/server/auth";
 import {
   discardUpdateRevisionById,
   publishUpdateById,
   getUpdateByIdForAdmin,
   saveUpdate,
-} from "@/server/repositories/updates";
-import { getSiteSettings } from "@/server/repositories/site";
+} from "@/server/supabase/updates";
+import { getSiteSettings } from "@/server/supabase/site";
 import { siteConfig } from "@/lib/site";
+import { CONTENT_STATUS, type ContentStatus } from "@/types/domain";
 
 export type SaveUpdateEditorState = {
   error: string | null;
@@ -23,13 +23,13 @@ export async function saveUpdateAction(
   _previousState: SaveUpdateEditorState,
   formData: FormData,
 ): Promise<SaveUpdateEditorState> {
-  await requireAdminSession();
+  await requireAdmin();
   const intent = getOptionalString(formData, "intent") ?? "save";
   const currentStatus = getContentStatus(formData, "currentStatus");
 
   const publishedAtInput = getOptionalString(formData, "publishedAt");
   const publishedAt = publishedAtInput ? parsePublishedAtInput(publishedAtInput) : null;
-  const updateId = getOptionalUpdateId(formData, "updateId");
+  const updateId = getOptionalString(formData, "updateId");
   const siteSettings = await getSiteSettings();
   const fallbackAuthorName = siteSettings?.authorName ?? siteConfig.author;
   const content = parseRichTextContent(formData);
@@ -38,7 +38,7 @@ export async function saveUpdateAction(
   try {
     const update = await saveUpdate({
       id: updateId ?? undefined,
-      content: content as unknown as Prisma.JsonValue,
+      content,
       contentHtml,
       authorName: fallbackAuthorName,
       status: currentStatus,
@@ -54,7 +54,7 @@ export async function saveUpdateAction(
     revalidatePath("/admin/workbench");
     revalidatePath("/admin/compose/update");
 
-    if (intent !== "publish" && typeof updateId !== "number") {
+    if (intent !== "publish" && !updateId) {
       return {
         error: null,
         redirectTo: `/admin/compose/update?id=${encodeURIComponent(update.id)}`,
@@ -85,15 +85,15 @@ export async function saveUpdateAction(
 }
 
 export async function discardUpdateRevisionAction(formData: FormData) {
-  await requireAdminSession();
-  const updateId = getRequiredUpdateId(formData, "updateId");
+  await requireAdmin();
+  const updateId = getRequiredString(formData, "updateId");
   const currentUpdate = await getUpdateByIdForAdmin(updateId);
 
   if (!currentUpdate) {
     throw new Error("草稿不存在或已被删除。");
   }
 
-  if (!currentUpdate.draftSnapshot) {
+  if (!currentUpdate.hasDraftRevision) {
     throw new Error("这条动态没有可以删除的草稿。");
   }
 
@@ -117,24 +117,10 @@ function getOptionalString(formData: FormData, key: string) {
   return normalized ? normalized : null;
 }
 
-function getOptionalUpdateId(formData: FormData, key: string) {
+function getRequiredString(formData: FormData, key: string) {
   const value = getOptionalString(formData, key);
 
   if (!value) {
-    return null;
-  }
-
-  if (!/^\d+$/.test(value)) {
-    throw new Error("请填写有效的动态编号。");
-  }
-
-  return Number(value);
-}
-
-function getRequiredUpdateId(formData: FormData, key: string) {
-  const value = getOptionalUpdateId(formData, key);
-
-  if (value === null) {
     throw new Error(`请填写 ${key}。`);
   }
 
@@ -144,7 +130,7 @@ function getRequiredUpdateId(formData: FormData, key: string) {
 function getContentStatus(formData: FormData, key: string): ContentStatus {
   const value = getOptionalString(formData, key);
 
-  return value === ContentStatus.PUBLISHED ? ContentStatus.PUBLISHED : ContentStatus.DRAFT;
+  return value === CONTENT_STATUS.PUBLISHED ? CONTENT_STATUS.PUBLISHED : CONTENT_STATUS.DRAFT;
 }
 
 function parseRichTextContent(formData: FormData) {
@@ -190,8 +176,9 @@ function parsePublishedAtInput(value: string) {
 
 function isUniqueConstraintError(error: unknown) {
   return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
+    error instanceof Error &&
+    "code" in error &&
+    (error as any).code === "23505"
   );
 }
 
