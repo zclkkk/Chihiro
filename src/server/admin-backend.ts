@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getInstallationState, type InstallationStatus } from "@/server/installation";
+import { getInstallationState } from "@/server/installation";
 
 export type AdminBackendStatus =
   | "ready"
@@ -28,7 +28,7 @@ export function getAdminBackendStatusMessage(status: Exclude<AdminBackendStatus,
     return {
       title: "后台尚未完成初始化",
       description:
-        "当前站点还没有安装标记。前往安装页完成站点信息和首个管理员初始化；如果数据库当前不可用，安装页会继续提示你先恢复数据库。",
+        "当前数据库里还没有完整的站点信息和管理员帐号。前往安装页完成初始化；如果数据库当前不可用，安装页会继续提示你先恢复数据库。",
     };
   }
 

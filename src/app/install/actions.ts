@@ -10,7 +10,7 @@ import {
 } from "@/lib/admin-auth";
 import { createAdminSessionForUser } from "@/server/auth";
 import { isDatabaseUnavailableError } from "@/server/database-errors";
-import { getInstallationState, markInstallationComplete } from "@/server/installation";
+import { getInstallationState } from "@/server/installation";
 import { hashPassword } from "@/server/passwords";
 import { createAdminUser, countAdminUsers } from "@/server/repositories/admin-auth";
 import { upsertSiteSettings } from "@/server/repositories/site";
@@ -137,8 +137,6 @@ export async function initializeSiteAction(
   if (createdAdminId) {
     await createAdminSessionForUser(createdAdminId);
   }
-
-  await markInstallationComplete();
 
   revalidatePath("/");
   revalidatePath("/posts");

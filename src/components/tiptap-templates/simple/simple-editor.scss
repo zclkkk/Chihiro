@@ -178,6 +178,8 @@ html[data-theme="dark"] .simple-editor-code-pane {
 
 .simple-editor-code-input {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 100%;
   flex: 1;
   resize: none;
@@ -192,8 +194,10 @@ html[data-theme="dark"] .simple-editor-code-pane {
   tab-size: 2;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  word-wrap: break-word;
   word-break: break-word;
   overflow: auto;
+  overflow-x: hidden;
 }
 
 html[data-theme="dark"] .simple-editor-code-input {
