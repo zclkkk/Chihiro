@@ -12,7 +12,6 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   docker:
@@ -22,60 +21,77 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Resolve image name
-        id: image
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker image
+      - name: Build Docker image archive
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
-          tags: |
-            ${{ steps.image.outputs.name }}:${{ github.sha }}
-            ${{ steps.image.outputs.name }}:latest
+          tags: chihiro:${{ github.sha }}
+          outputs: type=docker,dest=chihiro-image.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Upload image archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: chihiro-image
+          path: chihiro-image.tar
+          retention-days: 1
 
   deploy:
     needs: docker
     runs-on: ubuntu-latest
 
     steps:
-      - name: Resolve image name
-        id: image
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Deploy over SSH
+      - name: Download image archive
+        uses: actions/download-artifact@v4
+        with:
+          name: chihiro-image
+
+      - name: Prepare deploy directory
         uses: appleboy/ssh-action@v1.2.0
         env:
-          APP_DIR: ${{ vars.DEPLOY_PATH || '/srv/chihiro/current' }}
-          DEPLOY_BRANCH: ${{ github.ref_name }}
-          CHIHIRO_IMAGE: ${{ steps.image.outputs.name }}:${{ github.sha }}
-          COMPOSE_PROJECT_NAME: ${{ vars.COMPOSE_PROJECT_NAME || 'chihiro' }}
-          GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          APP_DIR: ${{ vars.DEPLOY_PATH || '/www/wwwroot/www.xiami.dev' }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ vars.DEPLOY_PORT || 22 }}
           script_stop: true
-          envs: APP_DIR,DEPLOY_BRANCH,CHIHIRO_IMAGE,COMPOSE_PROJECT_NAME,GHCR_USERNAME,GHCR_TOKEN
+          envs: APP_DIR
           script: |
-            git config --global --add safe.directory "$APP_DIR"
+            mkdir -p "$APP_DIR/scripts/deploy"
+
+      - name: Upload deployment files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ vars.DEPLOY_PORT || 22 }}
+          source: "chihiro-image.tar,docker-compose.yml,scripts/deploy/docker-load-deploy.sh"
+          target: ${{ vars.DEPLOY_PATH || '/www/wwwroot/www.xiami.dev' }}
+          overwrite: true
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          APP_DIR: ${{ vars.DEPLOY_PATH || '/www/wwwroot/www.xiami.dev' }}
+          CHIHIRO_IMAGE: chihiro:${{ github.sha }}
+          COMPOSE_PROJECT_NAME: ${{ vars.COMPOSE_PROJECT_NAME || 'chihiro' }}
+          IMAGE_TAR: chihiro-image.tar
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ vars.DEPLOY_PORT || 22 }}
+          script_stop: true
+          envs: APP_DIR,CHIHIRO_IMAGE,COMPOSE_PROJECT_NAME,IMAGE_TAR
+          script: |
             cd "$APP_DIR"
-            git fetch origin "$DEPLOY_BRANCH"
-            git checkout "$DEPLOY_BRANCH"
-            git pull --ff-only origin "$DEPLOY_BRANCH"
-            bash scripts/deploy/docker-deploy.sh
+            bash scripts/deploy/docker-load-deploy.sh

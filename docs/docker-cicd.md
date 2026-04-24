@@ -1,6 +1,6 @@
 # Docker + CI/CD 部署
 
-这套部署让 GitHub Actions 构建 Docker 镜像并推送到 GHCR，服务器只负责拉取镜像和 `docker compose up -d`。容器启动时会先执行 `prisma migrate deploy`，再启动 Next.js。
+这套部署让 GitHub Actions 构建 Docker 镜像，把镜像包和 compose 配置上传到服务器，服务器只负责 `docker load` 和 `docker compose up -d`。容器启动时会先执行 `prisma migrate deploy`，再启动 Next.js。
 
 ## 服务器首次准备
 
@@ -13,10 +13,8 @@
 项目目录仍然建议放在固定路径，例如：
 
 ```bash
-mkdir -p /srv/chihiro
-cd /srv/chihiro
-git clone <your-repo-url> current
-cd current
+mkdir -p /www/wwwroot/www.xiami.dev
+cd /www/wwwroot/www.xiami.dev
 cp .env.example .env
 ```
 
@@ -46,32 +44,24 @@ RUN_MIGRATIONS="true"
 - `DEPLOY_HOST`：服务器 IP 或域名
 - `DEPLOY_USER`：SSH 用户
 - `DEPLOY_SSH_KEY`：部署私钥
-- `GHCR_TOKEN`：可选；如果 GHCR 镜像是 private，需要一个带 `read:packages` 权限的 PAT
-
 需要的 GitHub Variables：
 
-- `DEPLOY_PATH`：服务器项目目录，默认 `/srv/chihiro/current`
+- `DEPLOY_PATH`：服务器项目目录，默认 `/www/wwwroot/www.xiami.dev`
 - `DEPLOY_PORT`：SSH 端口，默认 `22`
 - `COMPOSE_PROJECT_NAME`：compose 项目名，默认 `chihiro`
 
-Actions 会把镜像推送到：
-
-```text
-ghcr.io/<owner>/<repo>:<commit-sha>
-ghcr.io/<owner>/<repo>:latest
-```
-
-部署时实际使用 commit sha 标签，避免 `latest` 缓存或漂移导致发布内容不确定。
+不需要配置 GHCR，也不需要服务器目录是 git 仓库。
 
 ## 日常部署流程
 
 推送到 `main` 后，`.github/workflows/deploy.yml` 会自动：
 
 1. 构建 Docker 镜像
-2. 推送到 GHCR
-3. SSH 到服务器
-4. 拉取服务器上的最新 compose 配置
-5. 执行 `docker compose pull && docker compose up -d --remove-orphans`
+2. 导出 `chihiro-image.tar`
+3. SSH 到服务器创建部署目录
+4. 上传 `chihiro-image.tar`、`docker-compose.yml` 和部署脚本
+5. 执行 `docker load -i chihiro-image.tar`
+6. 执行 `docker compose up -d --remove-orphans`
 
 容器启动入口在 `docker/entrypoint.sh`，默认会跑：
 
@@ -91,9 +81,9 @@ RUN_MIGRATIONS="false"
 
 ```bash
 APP_DIR=/srv/chihiro/current \
-DEPLOY_BRANCH=main \
-CHIHIRO_IMAGE=ghcr.io/<owner>/<repo>:latest \
-bash scripts/deploy/docker-deploy.sh
+CHIHIRO_IMAGE=chihiro:<commit-sha> \
+IMAGE_TAR=chihiro-image.tar \
+bash scripts/deploy/docker-load-deploy.sh
 ```
 
 常用排查命令：
