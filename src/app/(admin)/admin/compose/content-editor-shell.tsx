@@ -5,6 +5,7 @@ import type { ReactNode, RefObject } from "react";
 type ContentEditorShellProps = {
   formAction: (formData: FormData) => void;
   formRef?: RefObject<HTMLFormElement | null>;
+  onSubmit?: () => void;
   hiddenFields: ReactNode;
   main: ReactNode;
   sidebar: ReactNode;
@@ -16,6 +17,7 @@ type ContentEditorShellProps = {
 export function ContentEditorShell({
   formAction,
   formRef,
+  onSubmit,
   hiddenFields,
   main,
   sidebar,
@@ -24,7 +26,7 @@ export function ContentEditorShell({
   footerRight,
 }: ContentEditorShellProps) {
   return (
-    <form ref={formRef} action={formAction} className="grid gap-6 pb-8">
+    <form ref={formRef} action={formAction} onSubmit={onSubmit} className="grid gap-6 pb-8">
       {hiddenFields}
 
       <section className="grid gap-10 lg:min-h-[calc(100dvh-20rem)] lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-14">

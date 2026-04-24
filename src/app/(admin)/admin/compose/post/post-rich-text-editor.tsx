@@ -6,12 +6,14 @@ import { parseStoredRichTextContent } from "@/lib/rich-text-content";
 type PostRichTextEditorProps = {
   initialContent: unknown;
   initialContentHtml?: string | null;
+  onDirtyChange?: (isDirty: boolean) => void;
   placeholder?: string;
 };
 
 export function PostRichTextEditor({
   initialContent,
   initialContentHtml,
+  onDirtyChange,
   placeholder,
 }: PostRichTextEditorProps) {
   void placeholder;
@@ -26,6 +28,7 @@ export function PostRichTextEditor({
       initialContentHtml={initialContentHtml}
       contentFieldName="content"
       htmlFieldName="contentHtml"
+      onDirtyChange={onDirtyChange}
       showThemeToggle={false}
     />
   );

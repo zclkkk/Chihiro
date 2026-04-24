@@ -186,6 +186,7 @@ type SimpleEditorProps = {
   initialContentHtml?: string | null
   contentFieldName?: string
   htmlFieldName?: string
+  onDirtyChange?: (isDirty: boolean) => void
   showThemeToggle?: boolean
 }
 
@@ -199,6 +200,7 @@ export function SimpleEditor({
   initialContentHtml = null,
   contentFieldName = "content",
   htmlFieldName = "contentHtml",
+  onDirtyChange,
   showThemeToggle = false,
 }: SimpleEditorProps) {
   const isMobile = useIsBreakpoint()
@@ -210,6 +212,7 @@ export function SimpleEditor({
   const toolbarRef = useRef<HTMLDivElement>(null)
   const [serializedContent, setSerializedContent] = useState("null")
   const [serializedHtml, setSerializedHtml] = useState("")
+  const initialSignatureRef = useRef<string | null>(null)
   const activeMobileView = isMobile ? mobileView : "main"
 
   const editor = useEditor({
@@ -250,12 +253,21 @@ export function SimpleEditor({
     ],
     content: initialContent ?? initialContentHtml ?? EMPTY_DOCUMENT,
     onCreate({ editor }) {
-      setSerializedContent(JSON.stringify(editor.getJSON()))
-      setSerializedHtml(editor.getHTML())
+      const nextContent = JSON.stringify(editor.getJSON())
+      const nextHtml = editor.getHTML()
+
+      initialSignatureRef.current = getEditorSignature(nextContent, nextHtml)
+      setSerializedContent(nextContent)
+      setSerializedHtml(nextHtml)
+      onDirtyChange?.(false)
     },
     onUpdate({ editor }) {
-      setSerializedContent(JSON.stringify(editor.getJSON()))
-      setSerializedHtml(editor.getHTML())
+      const nextContent = JSON.stringify(editor.getJSON())
+      const nextHtml = editor.getHTML()
+
+      setSerializedContent(nextContent)
+      setSerializedHtml(nextHtml)
+      onDirtyChange?.(getEditorSignature(nextContent, nextHtml) !== initialSignatureRef.current)
     },
   })
 
@@ -287,8 +299,12 @@ export function SimpleEditor({
     const nextHtml = nextCodeValue.trim() || "<p></p>"
 
     editor.commands.setContent(nextHtml)
-    setSerializedContent(JSON.stringify(editor.getJSON()))
-    setSerializedHtml(editor.getHTML())
+    const nextContent = JSON.stringify(editor.getJSON())
+    const renderedHtml = editor.getHTML()
+
+    setSerializedContent(nextContent)
+    setSerializedHtml(renderedHtml)
+    onDirtyChange?.(getEditorSignature(nextContent, renderedHtml) !== initialSignatureRef.current)
   }
 
   return (
@@ -346,6 +362,10 @@ export function SimpleEditor({
       </EditorContext.Provider>
     </div>
   )
+}
+
+function getEditorSignature(content: string, html: string) {
+  return `${content}\n${html}`
 }
 
 function ModeToggle({

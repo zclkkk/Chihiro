@@ -19,6 +19,7 @@ import { formatAdminDateTime } from "@/app/(admin)/admin/utils";
 import { escapeHtmlText, stripHtml } from "@/lib/content";
 import { createCategoryAction } from "@/app/(admin)/admin/categories/actions";
 import { createTagAction } from "@/app/(admin)/admin/tags/actions";
+import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 import type { CategoryOption } from "@/server/repositories/categories";
 import type { TagOption } from "@/server/repositories/tags";
 import type { PostItem } from "@/server/repositories/posts";
@@ -56,9 +57,11 @@ export function PostEditorForm({ post, categories, tags, siteUrlBase, authorName
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
   const [previewState, setPreviewState] = useState<PostPreviewState | null>(null);
+  const [isEditorDirty, setIsEditorDirty] = useState(false);
   const handleCreatedCategoryRef = useRef<(category: CategoryOption) => void>(() => {});
   const handleCreatedTagRef = useRef<(tag: TagOption) => void>(() => {});
   const formRef = useRef<HTMLFormElement | null>(null);
+  const wasDirtyBeforeSubmitRef = useRef(false);
   const draftSavedAt = getDraftSavedAt(post);
   const hasSavedRevision = Boolean(post?.status === ContentStatus.PUBLISHED && draftSavedAt);
   const bottomPrompt = getBottomPrompt(post, draftSavedAt);
@@ -67,11 +70,23 @@ export function PostEditorForm({ post, categories, tags, siteUrlBase, authorName
     "uncategorized";
   const postUrlPrefix = `${siteUrlBase}/posts/${selectedCategorySlug}/`;
 
+  useUnsavedChangesWarning(isEditorDirty);
+
+  useEffect(() => {
+    if (state.error && wasDirtyBeforeSubmitRef.current) {
+      queueMicrotask(() => setIsEditorDirty(true));
+    }
+  }, [state.error]);
+
   return (
     <>
       <ContentEditorShell
         formRef={formRef}
         formAction={formAction}
+        onSubmit={() => {
+          wasDirtyBeforeSubmitRef.current = isEditorDirty;
+          setIsEditorDirty(false);
+        }}
         hiddenFields={
           <>
             <input type="hidden" name="postId" value={post?.id ?? ""} />
@@ -121,6 +136,7 @@ export function PostEditorForm({ post, categories, tags, siteUrlBase, authorName
             <PostRichTextEditor
               initialContent={editablePost?.content}
               initialContentHtml={editablePost?.contentHtml}
+              onDirtyChange={setIsEditorDirty}
             />
           </>
         }

@@ -17,6 +17,7 @@ import { PostRichTextEditor } from "@/app/(admin)/admin/compose/post/post-rich-t
 import { formatAdminDateTime } from "@/app/(admin)/admin/utils";
 import { getRenderedContentHtml } from "@/lib/content";
 import { getRichTextPreviewTitle, parseStoredRichTextContent } from "@/lib/rich-text-content";
+import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 import type { UpdateItem } from "@/server/repositories/updates";
 
 const initialState: SaveUpdateEditorState = {
@@ -42,10 +43,14 @@ export function UpdateEditorForm({ update, authorName }: UpdateEditorFormProps) 
   const editableUpdate = getEditableUpdate(update);
   const formRef = useRef<HTMLFormElement | null>(null);
   const [previewState, setPreviewState] = useState<UpdatePreviewState | null>(null);
+  const [isEditorDirty, setIsEditorDirty] = useState(false);
+  const wasDirtyBeforeSubmitRef = useRef(false);
   const draftSavedAt = getDraftSavedAt(update);
   const hasSavedRevision = Boolean(update?.status === ContentStatus.PUBLISHED && draftSavedAt);
   const bottomPrompt = getBottomPrompt(update, draftSavedAt);
   const status = update?.status ?? ContentStatus.DRAFT;
+
+  useUnsavedChangesWarning(isEditorDirty);
 
   useEffect(() => {
     if (state.redirectTo) {
@@ -53,11 +58,21 @@ export function UpdateEditorForm({ update, authorName }: UpdateEditorFormProps) 
     }
   }, [router, state.redirectTo]);
 
+  useEffect(() => {
+    if (state.error && wasDirtyBeforeSubmitRef.current) {
+      queueMicrotask(() => setIsEditorDirty(true));
+    }
+  }, [state.error]);
+
   return (
     <>
       <ContentEditorShell
         formRef={formRef}
         formAction={formAction}
+        onSubmit={() => {
+          wasDirtyBeforeSubmitRef.current = isEditorDirty;
+          setIsEditorDirty(false);
+        }}
         hiddenFields={
           <>
             <input type="hidden" name="updateId" value={update?.id ?? ""} />
@@ -74,6 +89,7 @@ export function UpdateEditorForm({ update, authorName }: UpdateEditorFormProps) 
             <PostRichTextEditor
               initialContent={editableUpdate?.content}
               initialContentHtml={editableUpdate?.contentHtml}
+              onDirtyChange={setIsEditorDirty}
               placeholder="开始写这条动态。支持标题、引用、链接和图片。"
             />
           </div>
