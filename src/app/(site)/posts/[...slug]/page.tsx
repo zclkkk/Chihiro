@@ -187,11 +187,15 @@ export default async function PostPage({ params }: PostPageProps) {
 
             {renderedContentHtml ? (
               <div
+                data-reading-progress-root
                 className="reading-copy mt-10 space-y-6 text-base leading-8 text-zinc-800 dark:text-zinc-200"
                 dangerouslySetInnerHTML={{ __html: contentWithToc?.html ?? renderedContentHtml }}
               />
             ) : (
-              <div className="reading-copy mt-10 space-y-6 text-base leading-8 text-zinc-800 dark:text-zinc-200">
+              <div
+                data-reading-progress-root
+                className="reading-copy mt-10 space-y-6 text-base leading-8 text-zinc-800 dark:text-zinc-200"
+              >
                 <p>暂无内容。</p>
               </div>
             )}

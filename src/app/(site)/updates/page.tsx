@@ -173,33 +173,37 @@ async function UpdatesPageContent({
               </div>
 
               <StaggerReveal className="grid gap-6" delayChildren={0.02} staggerChildren={0.065}>
-                {group.items.map((item) => (
-                  <StaggerRevealItem key={item.id}>
-                    <article
-                      id={`update-${item.id}`}
-                      className="grid gap-4 border-b border-zinc-200/80 py-6 last:border-b-0 dark:border-zinc-800/80 sm:grid-cols-[5.5rem_minmax(0,1fr)] sm:gap-6 scroll-mt-24"
-                    >
-                      <div className="min-w-[4.5rem]">
-                        <p className="text-[0.68rem] uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
-                          {formatFeedMonth(item.publishedAt)}
-                        </p>
-                        <p className="mt-1 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-                          {formatFeedDay(item.publishedAt)}
-                        </p>
-                      </div>
+                {group.items.map((item) => {
+                  const preview = getContentPreview(item.contentHtml, item.content);
 
-                      <div>
-                        <p className="reading-copy updates-copy mt-3 max-w-3xl text-base leading-8 text-zinc-600 dark:text-zinc-300">
-                          {getContentPreview(item.contentHtml, item.content)}
-                        </p>
-                        <div className="mt-3 flex items-center justify-between gap-4 text-sm text-zinc-500 dark:text-zinc-400">
-                          <span>{formatFeedTime(item.publishedAt)}</span>
-                          <span>{item.authorName ?? "未署名"}</span>
+                  return (
+                    <StaggerRevealItem key={item.id}>
+                      <article
+                        id={`update-${item.id}`}
+                        className="grid gap-4 border-b border-zinc-200/80 py-6 last:border-b-0 dark:border-zinc-800/80 sm:grid-cols-[5.5rem_minmax(0,1fr)] sm:gap-6 scroll-mt-24"
+                      >
+                        <div className="min-w-[4.5rem]">
+                          <p className="text-[0.68rem] uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
+                            {formatFeedMonth(item.publishedAt)}
+                          </p>
+                          <p className="mt-1 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+                            {formatFeedDay(item.publishedAt)}
+                          </p>
                         </div>
-                      </div>
-                    </article>
-                  </StaggerRevealItem>
-                ))}
+
+                        <div>
+                          <p className="reading-copy updates-copy mt-3 max-w-3xl text-base leading-8 text-zinc-600 dark:text-zinc-300">
+                            {renderUpdatePreview(preview)}
+                          </p>
+                          <div className="mt-3 flex items-center justify-between gap-4 text-sm text-zinc-500 dark:text-zinc-400">
+                            <span>{formatFeedTime(item.publishedAt)}</span>
+                            <span>{item.authorName ?? "未署名"}</span>
+                          </div>
+                        </div>
+                      </article>
+                    </StaggerRevealItem>
+                  );
+                })}
               </StaggerReveal>
             </StaggerRevealItem>
           ))
@@ -363,6 +367,27 @@ function formatFeedTime(value: string | null) {
     minute: "2-digit",
     hour12: false,
   }).format(date);
+}
+
+function renderUpdatePreview(preview: string) {
+  const trimmedPreview = preview.trimStart();
+  const leadingWhitespace = preview.slice(0, preview.length - trimmedPreview.length);
+  const [firstCharacter = "", ...restCharacters] = Array.from(trimmedPreview);
+
+  if (!firstCharacter) {
+    return preview;
+  }
+
+  return (
+    <>
+      {leadingWhitespace}
+      <span className="updates-drop-cap" aria-hidden="true">
+        {firstCharacter}
+      </span>
+      <span className="sr-only">{firstCharacter}</span>
+      {restCharacters.join("")}
+    </>
+  );
 }
 
 function getPageValue(value?: string) {
