@@ -63,7 +63,7 @@ export type PublicRecentArchiveItem = {
   title: string;
   categoryLabel: string;
   publishedAt: string | null;
-  kind: "文章" | "动态";
+  kind: "篇章" | "足迹";
 };
 
 export async function getPublicSiteSettings(): Promise<SiteSettingsRecord> {
@@ -258,7 +258,7 @@ export async function listPublicRecentArchiveItems(
         title: post.title,
         categoryLabel: post.category?.name ?? "Uncategorized",
         publishedAt: post.publishedAt,
-        kind: "文章" as const,
+        kind: "篇章" as const,
       })),
       ...updates.map((item) => ({
         id: item.id,
@@ -267,9 +267,9 @@ export async function listPublicRecentArchiveItems(
           page: 1,
         }),
         title: item.title,
-        categoryLabel: "动态",
+        categoryLabel: "足迹",
         publishedAt: item.publishedAt,
-        kind: "动态" as const,
+        kind: "足迹" as const,
       })),
     ]
       .sort((a, b) => {
@@ -306,9 +306,9 @@ export async function listPublicRecentUpdateItems(
         page: 1,
       }),
       title: item.title,
-      categoryLabel: "动态",
+      categoryLabel: "足迹",
       publishedAt: item.publishedAt,
-      kind: "动态" as const,
+      kind: "足迹" as const,
     }));
   } catch (error) {
     if (isDatabaseUnavailableError(error) || isDatabaseSchemaMissingError(error)) {
