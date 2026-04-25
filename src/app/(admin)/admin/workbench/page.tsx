@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CONTENT_STATUS } from "@/types/domain";
 import { ContentListPanel, StatusBadge } from "@/app/(admin)/admin/ui";
-import { listPostCategories } from "@/server/supabase/categories";
+import { listCategoriesForAdmin } from "@/server/supabase/categories";
 import { listPostsForAdmin } from "@/server/supabase/posts";
 import { listTags } from "@/server/supabase/tags";
 import { listUpdatesForAdmin } from "@/server/supabase/updates";
@@ -29,7 +29,7 @@ export default async function AdminWorkbenchPage({
   const [posts, updates, postCategories, tags] = await Promise.all([
     listPostsForAdmin(),
     listUpdatesForAdmin(),
-    listPostCategories(),
+    listCategoriesForAdmin(),
     listTags(),
   ]);
   const sortedPosts = sortWorkbenchPosts(posts, getWorkbenchSortValue(sort));
