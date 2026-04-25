@@ -459,9 +459,7 @@ export async function publishPostById(id: string): Promise<PostItem> {
 
     await supabase.from("post_revisions").delete().eq("post_id", id).eq("kind", "draft");
 
-    if (draftRevision.tagIds && draftRevision.tagIds.length > 0) {
-      await syncPostTags(supabase, id, draftRevision.tagIds);
-    }
+    await syncPostTags(supabase, id, draftRevision.tagIds ?? []);
 
     const tagsSnapshot = draftRevision.tagIds
       ? await fetchTagSnapshots(supabase, draftRevision.tagIds)
@@ -550,9 +548,7 @@ export async function discardPostRevisionById(id: string): Promise<PostItem> {
 
   await supabase.from("post_revisions").delete().eq("post_id", id).eq("kind", "draft");
 
-  if (publishedRevision.tagIds && publishedRevision.tagIds.length > 0) {
-    await syncPostTags(supabase, id, publishedRevision.tagIds);
-  }
+  await syncPostTags(supabase, id, publishedRevision.tagIds ?? []);
 
   const post = await getPostByIdForAdmin(id);
   if (!post) {
