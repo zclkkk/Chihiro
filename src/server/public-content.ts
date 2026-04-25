@@ -3,13 +3,13 @@ import "server-only";
 import { hasAdminUsers, isAdminAuthenticated } from "@/server/auth";
 import { getInstallationState } from "@/server/installation";
 import { getSiteSettings } from "@/server/supabase/site";
-import { listAllPublishedPosts } from "@/server/supabase/posts";
-import { listAllPublishedUpdates } from "@/server/supabase/updates";
+import { listAllPublishedPosts, getPublishedPostBySlug, listPublishedPosts } from "@/server/supabase/posts";
+import { listAllPublishedUpdates, listPublishedUpdates } from "@/server/supabase/updates";
 import { listPostCategories } from "@/server/supabase/categories";
 import { listRecentPublishedPostsForNavigation, listPublishedPostCategoriesForNavigation } from "@/server/supabase/posts";
 import { listRecentPublishedUpdatesForNavigation } from "@/server/supabase/updates";
 import { getPostPath, getUpdateAnchorPath } from "@/lib/routes";
-import type { SiteSettingsRecord, PostItem, UpdateItem, CategoryOption } from "@/types/domain";
+import type { SiteSettingsRecord, PostItem, UpdateItem, CategoryOption, PostListSort, UpdateListSort } from "@/types/domain";
 
 export class PublicSiteUnavailableError extends Error {
   constructor() {
@@ -71,9 +71,20 @@ export async function listPublicPosts(): Promise<PostItem[]> {
   return await listAllPublishedPosts();
 }
 
+export async function listPublicPostsPaginated(options: {
+  page?: number;
+  pageSize?: number;
+  sort?: PostListSort;
+  categorySlug?: string;
+  tagSlugs?: string[];
+}) {
+  await assertInstalledPublicSite();
+  return listPublishedPosts(options);
+}
+
 export async function getPublicPostBySlug(slug: string): Promise<PostItem | null> {
-  const posts = await listPublicPosts();
-  return posts.find((item) => item.slug === slug) ?? null;
+  await assertInstalledPublicSite();
+  return getPublishedPostBySlug(slug);
 }
 
 export async function getPublicPostByCategoryAndSlug(
@@ -102,6 +113,15 @@ export async function getPublicPostRouteParams(): Promise<Array<{ category: stri
 export async function listPublicUpdates(): Promise<UpdateItem[]> {
   await assertInstalledPublicSite();
   return await listAllPublishedUpdates();
+}
+
+export async function listPublicUpdatesPaginated(options: {
+  page?: number;
+  pageSize?: number;
+  sort?: UpdateListSort;
+}) {
+  await assertInstalledPublicSite();
+  return listPublishedUpdates(options);
 }
 
 export async function listPublicPostCategories(): Promise<CategoryOption[]> {

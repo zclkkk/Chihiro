@@ -70,6 +70,23 @@ export async function getPostByIdForAdmin(id: string): Promise<PostItem | null> 
   return mapPostRecord(data as unknown as PostRowWithRelations, revisions);
 }
 
+export async function getPublishedPostBySlug(slug: string): Promise<PostItem | null> {
+  const supabase = createAnonClient();
+
+  const { data, error } = await supabase
+    .from("posts")
+    .select(POST_SELECT)
+    .eq("status", "published")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return mapPublicPostRecord(data as unknown as PostRowWithRelations);
+}
+
 export async function listAllPublishedPosts(
   options: { categorySlug?: string; tagSlugs?: string[]; query?: string } = {},
 ): Promise<PostItem[]> {
@@ -129,19 +146,91 @@ export async function listPublishedPosts(
     query?: string;
   } = {},
 ): Promise<PostListResult> {
+  const supabase = createAnonClient();
   const pageSize = getSafePageSize(options.pageSize);
   const page = getSafePage(options.page);
-  const allItems = await listAllPublishedPosts(options);
-  const sortedItems = sortPublishedPosts(allItems, options.sort);
-  const totalCount = sortedItems.length;
-  const paginatedItems = sortedItems.slice((page - 1) * pageSize, page * pageSize);
+
+  let queryBuilder = supabase
+    .from("posts")
+    .select(POST_SELECT, { count: "exact" })
+    .eq("status", "published");
+
+  if (options.categorySlug) {
+    if (options.categorySlug === "uncategorized") {
+      queryBuilder = queryBuilder.is("category_id", null);
+    } else {
+      const { data: catData } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("slug", options.categorySlug)
+        .maybeSingle();
+      if (!catData) {
+        return { items: [], page, pageSize, totalCount: 0, totalPages: 0 };
+      }
+      queryBuilder = queryBuilder.eq("category_id", catData.id);
+    }
+  }
+
+  if (options.tagSlugs && options.tagSlugs.length > 0) {
+    const { data: tagData } = await supabase
+      .from("tags")
+      .select("id")
+      .in("slug", options.tagSlugs);
+    if (!tagData || tagData.length === 0) {
+      return { items: [], page, pageSize, totalCount: 0, totalPages: 0 };
+    }
+    const tagIds = tagData.map((t) => t.id);
+    const { data: postTagData } = await supabase
+      .from("post_tags")
+      .select("post_id")
+      .in("tag_id", tagIds);
+    if (!postTagData || postTagData.length === 0) {
+      return { items: [], page, pageSize, totalCount: 0, totalPages: 0 };
+    }
+    const postTagCounts = new Map<string, number>();
+    for (const pt of postTagData) {
+      postTagCounts.set(pt.post_id, (postTagCounts.get(pt.post_id) ?? 0) + 1);
+    }
+    const matchingPostIds = [...postTagCounts.entries()]
+      .filter(([, count]) => count === tagIds.length)
+      .map(([id]) => id);
+    if (matchingPostIds.length === 0) {
+      return { items: [], page, pageSize, totalCount: 0, totalPages: 0 };
+    }
+    queryBuilder = queryBuilder.in("id", matchingPostIds);
+  }
+
+  if (options.query) {
+    const q = options.query.replace(/[%_]/g, "\\$&");
+    queryBuilder = queryBuilder.or(`title.ilike.%${q}%,summary.ilike.%${q}%`);
+  }
+
+  if (options.sort === "earliest") {
+    queryBuilder = queryBuilder.order("published_at", { ascending: true });
+  } else if (options.sort === "updated") {
+    queryBuilder = queryBuilder.order("updated_at", { ascending: false });
+  } else {
+    queryBuilder = queryBuilder.order("published_at", { ascending: false });
+  }
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  queryBuilder = queryBuilder.range(from, to);
+
+  const { data, error, count } = await queryBuilder;
+
+  if (error) {
+    throw error;
+  }
+
+  const items = ((data ?? []) as unknown as PostRowWithRelations[]).map(mapPublicPostRecord);
 
   return {
-    items: paginatedItems,
+    items,
     page,
     pageSize,
-    totalCount,
-    totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
+    totalCount: count ?? 0,
+    totalPages: Math.max(1, Math.ceil((count ?? 0) / pageSize)),
   };
 }
 

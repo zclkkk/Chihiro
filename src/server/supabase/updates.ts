@@ -55,29 +55,23 @@ export async function listAllPublishedUpdates(
 ): Promise<UpdateItem[]> {
   const supabase = createAnonClient();
 
-  const { data, error } = await supabase
+  let queryBuilder = supabase
     .from("updates")
     .select(UPDATE_SELECT)
-    .eq("status", "published")
-    .order("published_at", { ascending: false });
+    .eq("status", "published");
+
+  if (options.query) {
+    const q = options.query.replace(/[%_]/g, "\\$&");
+    queryBuilder = queryBuilder.or(`title.ilike.%${q}%,content_html.ilike.%${q}%`);
+  }
+
+  const { data, error } = await queryBuilder.order("published_at", { ascending: false });
 
   if (error) {
     throw error;
   }
 
-  let items = (data ?? []).map((update) => mapUpdateRecord(update, new Map()));
-
-  if (options.query) {
-    const q = options.query.toLowerCase();
-    items = items.filter((item) => {
-      const haystack = [item.title, item.authorName ?? "", item.contentHtml ?? ""]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }
-
-  return items;
+  return (data ?? []).map((update) => mapUpdateRecord(update, new Map()));
 }
 
 export async function listPublishedUpdates(
@@ -88,18 +82,44 @@ export async function listPublishedUpdates(
     query?: string;
   } = {},
 ): Promise<UpdateListResult> {
+  const supabase = createAnonClient();
   const pageSize = getSafePageSize(options.pageSize);
   const page = getSafePage(options.page);
-  const allItems = await listAllPublishedUpdates(options);
-  const totalCount = allItems.length;
-  const paginatedItems = allItems.slice((page - 1) * pageSize, page * pageSize);
+
+  let queryBuilder = supabase
+    .from("updates")
+    .select(UPDATE_SELECT, { count: "exact" })
+    .eq("status", "published");
+
+  if (options.query) {
+    const q = options.query.replace(/[%_]/g, "\\$&");
+    queryBuilder = queryBuilder.or(`title.ilike.%${q}%,content_html.ilike.%${q}%`);
+  }
+
+  if (options.sort === "earliest") {
+    queryBuilder = queryBuilder.order("published_at", { ascending: true });
+  } else {
+    queryBuilder = queryBuilder.order("published_at", { ascending: false });
+  }
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  queryBuilder = queryBuilder.range(from, to);
+
+  const { data, error, count } = await queryBuilder;
+
+  if (error) {
+    throw error;
+  }
+
+  const items = (data ?? []).map((update) => mapUpdateRecord(update, new Map()));
 
   return {
-    items: paginatedItems,
+    items,
     page,
     pageSize,
-    totalCount,
-    totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
+    totalCount: count ?? 0,
+    totalPages: Math.max(1, Math.ceil((count ?? 0) / pageSize)),
   };
 }
 
@@ -323,8 +343,12 @@ export async function discardUpdateRevisionById(id: string): Promise<UpdateItem>
     const { error } = await supabase
       .from("updates")
       .update({
-        status: CONTENT_STATUS.PUBLISHED,
+        title: publishedRevision.title,
+        content: publishedRevision.content as Json,
+        content_html: publishedRevision.contentHtml,
+        author_name: publishedRevision.authorName,
         published_at: publishedRevision.publishedAt ?? current.publishedAt,
+        status: CONTENT_STATUS.PUBLISHED,
       })
       .eq("id", id);
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getPostPath } from "@/lib/routes";
 import { requireAdmin } from "@/server/auth";
+import { createAsset } from "@/server/supabase/assets";
 import {
   deletePostById,
   publishPostById,
@@ -14,6 +15,7 @@ import {
   publishUpdateById,
   unpublishUpdateById,
 } from "@/server/supabase/updates";
+import type { AssetKind } from "@/types/domain";
 
 export async function publishPostAction(formData: FormData) {
   await requireAdmin();
@@ -104,4 +106,17 @@ function getRequiredString(formData: FormData, key: string) {
 function getRequiredId(formData: FormData, key: string) {
   const value = getRequiredString(formData, key);
   return value;
+}
+
+export async function createAssetAction(input: {
+  kind: AssetKind;
+  storagePath: string;
+  mimeType?: string | null;
+  size?: number | null;
+  width?: number | null;
+  height?: number | null;
+  alt?: string | null;
+}) {
+  await requireAdmin();
+  return createAsset(input);
 }

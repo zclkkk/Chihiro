@@ -388,6 +388,14 @@ export const handleImageUpload = async (
 
   const result = await uploadToSiteAssets(file, user.id, onProgress);
 
+  const { createAssetAction } = await import("@/app/(admin)/admin/actions");
+  await createAssetAction({
+    kind: "image",
+    storagePath: result.storagePath,
+    mimeType: file.type || null,
+    size: file.size,
+  });
+
   return result.publicUrl;
 }
 

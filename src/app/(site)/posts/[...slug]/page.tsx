@@ -21,7 +21,7 @@ type PostPageProps = {
   }>;
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 function getRouteState(segments: string[]) {
   if (segments.length === 1) {
