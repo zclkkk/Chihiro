@@ -3,7 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useDeferredValue, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
@@ -111,6 +118,7 @@ export function SiteHeader({
   const searchParams = useSearchParams();
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [stickyProgress, setStickyProgress] = useState(0);
   const [isMobileBrandVisible, setIsMobileBrandVisible] = useState(true);
   const [isMegaNavOpen, setIsMegaNavOpen] = useState(false);
   const [highlightedHref, setHighlightedHref] = useState<string | null>(null);
@@ -153,8 +161,10 @@ export function SiteHeader({
 
     const handleScroll = () => {
       const nextScrollTop = getScrollTop();
+      const nextStickyProgress = Math.min(Math.max(nextScrollTop / 20, 0), 1);
 
       setIsScrolled(nextScrollTop > 20);
+      setStickyProgress(Number(nextStickyProgress.toFixed(3)));
 
       if (nextScrollTop <= 20) {
         setIsMobileBrandVisible(true);
@@ -290,6 +300,10 @@ export function SiteHeader({
     navItems.find((item) => item.href === highlightedHref) ?? activeItem;
   const isAdminLoginOpen = searchParams.get("admin-login") === "1";
   const adminLoginNext = getSafeAdminPath(searchParams.get("next")) ?? "/admin";
+  const topStateWeight = 1 - stickyProgress;
+  const headerTranslateY = topStateWeight * 4;
+  const desktopHeaderTranslateY = topStateWeight * 10;
+  const brandScale = 1 + topStateWeight * 0.08;
 
   const openAdminLogin = (next = "/admin") => {
     const params = new URLSearchParams(searchParams.toString());
@@ -317,7 +331,13 @@ export function SiteHeader({
   return (
     <header className="pointer-events-none fixed inset-x-0 top-0 z-50 px-3 py-3 sm:px-6">
       <div
-        className="pointer-events-none relative mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 transition-all duration-300 md:grid md:grid-cols-[1fr_auto_1fr] md:justify-normal sm:px-6"
+        className="pointer-events-none relative mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] md:grid md:grid-cols-[1fr_auto_1fr] md:justify-normal sm:px-6"
+        style={
+          {
+            "--site-header-brand-scale": brandScale,
+            transform: `translateY(${headerTranslateY}px)`,
+          } as CSSProperties
+        }
       >
         <button
           ref={mobileMenuButtonRef}
@@ -356,12 +376,15 @@ export function SiteHeader({
               : "border border-transparent bg-transparent"
           }`}
         >
-          {siteName}
+          <span className="inline-block origin-left transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] md:scale-[var(--site-header-brand-scale)]">
+            {siteName}
+          </span>
         </Link>
 
         <div
           ref={megaNavRef}
-          className="pointer-events-auto relative hidden md:flex md:justify-center"
+          className="pointer-events-auto relative hidden transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] md:flex md:justify-center"
+          style={{ transform: `translateY(${desktopHeaderTranslateY}px)` }}
           onMouseLeave={closeMegaNav}
           onFocusCapture={() => {
             if (!highlightedHref) {
@@ -415,7 +438,10 @@ export function SiteHeader({
           </AnimatePresence>
         </div>
 
-        <div className="pointer-events-auto flex shrink-0 items-center gap-2 md:justify-self-end">
+        <div
+          className="pointer-events-auto flex shrink-0 items-center gap-2 transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] md:justify-self-end"
+          style={{ transform: `translateY(${desktopHeaderTranslateY}px)` }}
+        >
           <div className="hidden md:block">
             <ThemeModeToggle isScrolled={isScrolled} />
           </div>

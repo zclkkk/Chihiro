@@ -1,21 +1,14 @@
 import type { Metadata } from "next";
-import { Geist, JetBrains_Mono, Noto_Serif_SC } from "next/font/google";
+import { Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import { ThemeModeInit } from "@/components/theme-mode-init";
 import { resolveCanonicalSiteUrl, siteConfig } from "@/lib/site";
 import { getSiteSettings } from "@/server/supabase/site";
 import "./globals.css";
 
-const uiSans = Geist({
+const uiSans = Instrument_Sans({
   subsets: ["latin"],
   variable: "--font-ui",
   display: "swap",
-});
-
-const readingSerif = Noto_Serif_SC({
-  variable: "--font-reading",
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-  preload: false,
 });
 
 const codeMono = JetBrains_Mono({
@@ -58,7 +51,7 @@ export default function RootLayout({
   return (
     <html
       lang={siteConfig.locale}
-      className={`${uiSans.variable} ${readingSerif.variable} ${codeMono.variable} h-full antialiased`}
+      className={`${uiSans.variable} ${codeMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full overflow-x-hidden">

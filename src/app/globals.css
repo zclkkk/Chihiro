@@ -26,10 +26,10 @@
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --font-sans: var(--font-ui), "Avenir Next", "Segoe UI", "PingFang SC",
+  --font-sans: var(--font-ui), "Instrument Sans", "Avenir Next", "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  --font-serif: var(--font-reading), "Noto Serif SC", "Source Han Serif SC",
-    "Songti SC", "STSong", serif;
+  --font-serif: var(--font-ui), "Instrument Sans", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --font-mono: var(--font-code), "SFMono-Regular", "SF Mono", Consolas,
     "Liberation Mono", Menlo, monospace;
 }
@@ -61,15 +61,67 @@ body {
   font-family: var(--font-sans);
 }
 
+@keyframes toc-item-enter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.toc-item-enter {
+  animation: toc-item-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toc-item-enter {
+    animation: none;
+  }
+}
+
+@keyframes reading-progress-check-enter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.65);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.reading-progress-check-enter {
+  animation: reading-progress-check-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reading-progress-check-enter {
+    animation: none;
+  }
+}
+
 .reading-copy {
   font-family: var(--font-serif);
+  font-weight: 450;
 }
 
 .updates-copy {
-  font-family: ui-serif, STSong, "Songti SC", "Noto Serif SC",
-    "Source Han Serif SC", serif;
-  font-weight: 400;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 500;
   letter-spacing: 0;
+}
+
+.updates-drop-cap {
+  float: left;
+  margin: 0.2em 0.1em 0 0;
+  font-size: 1.9em;
+  line-height: 0.9;
+  font-weight: 600;
+  color: var(--primary);
 }
 
 .tiptap-editor {
