@@ -217,7 +217,6 @@ function revalidatePostSurface(slug: string, categorySlug?: string | null) {
   revalidatePath("/timeline");
   revalidatePath("/posts");
   revalidatePath(getPostPath({ slug, categorySlug }));
-  revalidatePath(`/posts/${slug}`);
   revalidatePath("/rss.xml");
   revalidatePath("/sitemap.xml");
 }
