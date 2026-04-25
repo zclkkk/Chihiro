@@ -87,9 +87,7 @@ export async function getPublishedPostBySlug(slug: string): Promise<PostItem | n
   return mapPublicPostRecord(data as unknown as PostRowWithRelations);
 }
 
-export async function listAllPublishedPosts(
-  options: { categorySlug?: string; tagSlugs?: string[]; query?: string } = {},
-): Promise<PostItem[]> {
+export async function listAllPublishedPosts(): Promise<PostItem[]> {
   const supabase = createAnonClient();
 
   const { data, error } = await supabase
@@ -102,38 +100,7 @@ export async function listAllPublishedPosts(
     throw error;
   }
 
-  let items = ((data ?? []) as unknown as PostRowWithRelations[]).map((post) => mapPublicPostRecord(post));
-
-  if (options.categorySlug) {
-    items = items.filter(
-      (item) => item.category?.slug === options.categorySlug || (!item.category && options.categorySlug === "uncategorized"),
-    );
-  }
-
-  if (options.tagSlugs && options.tagSlugs.length > 0) {
-    items = items.filter((item) =>
-      options.tagSlugs!.every((slug) => item.tags.some((tag) => tag.slug === slug)),
-    );
-  }
-
-  if (options.query) {
-    const q = options.query.toLowerCase();
-    items = items.filter((item) => {
-      const haystack = [
-        item.title,
-        item.summary ?? "",
-        item.contentHtml ?? "",
-        item.authorName ?? "",
-        item.category?.name ?? "",
-        ...item.tags.map((tag) => tag.name),
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }
-
-  return items;
+  return ((data ?? []) as unknown as PostRowWithRelations[]).map(mapPublicPostRecord);
 }
 
 export async function listPublishedPosts(
@@ -283,19 +250,6 @@ export async function listPublishedPostCategoriesForNavigation(
       title: p.title as string,
       slug: p.slug as string,
     })),
-  }));
-}
-
-export async function getPublishedPostSlugs(): Promise<string[]> {
-  const posts = await listAllPublishedPosts();
-  return posts.map((post) => post.slug);
-}
-
-export async function getPublishedPostRouteParams(): Promise<Array<{ category: string; slug: string }>> {
-  const posts = await listAllPublishedPosts();
-  return posts.map((post) => ({
-    category: post.category?.slug ?? "uncategorized",
-    slug: post.slug,
   }));
 }
 
@@ -707,9 +661,9 @@ async function syncPostTags(supabase: SupabaseClient<Database>, postId: string, 
 
 function mapPostRecord(
   post: PostRowWithRelations,
-  revisions: Map<string, { hasDraft: boolean; hasPublished: boolean }>,
+  revisions?: Map<string, { hasDraft: boolean; hasPublished: boolean }>,
 ): PostItem {
-  const rev = revisions.get(post.id) ?? { hasDraft: false, hasPublished: false };
+  const rev = revisions?.get(post.id) ?? { hasDraft: false, hasPublished: false };
   return {
     id: post.id,
     title: post.title,
@@ -744,41 +698,8 @@ function mapPostRecord(
   };
 }
 
-function mapPublicPostRecord(
-  post: PostRowWithRelations,
-): PostItem {
-  return {
-    id: post.id,
-    title: post.title,
-    slug: post.slug,
-    summary: post.summary,
-    status: post.status as ContentStatus,
-    content: post.content,
-    contentHtml: post.content_html,
-    authorName: post.author_name,
-    publishedAt: post.published_at ?? null,
-    createdAt: post.created_at,
-    updatedAt: post.updated_at,
-    hasDraftRevision: false,
-    hasPublishedRevision: false,
-    category: post.category
-      ? { id: post.category.id, name: post.category.name, slug: post.category.slug }
-      : null,
-    coverAsset: post.cover_asset
-      ? {
-          id: post.cover_asset.id,
-          alt: post.cover_asset.alt,
-          mimeType: post.cover_asset.mime_type,
-          width: post.cover_asset.width,
-          height: post.cover_asset.height,
-        }
-      : null,
-    tags: (post.post_tags ?? []).map((pt) => ({
-      id: pt.tags.id,
-      name: pt.tags.name,
-      slug: pt.tags.slug,
-    })),
-  };
+function mapPublicPostRecord(post: PostRowWithRelations): PostItem {
+  return mapPostRecord(post);
 }
 
 function getSafePage(value?: number) {
