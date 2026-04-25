@@ -15,6 +15,7 @@ import { ConfirmActionDialog } from "@/app/(admin)/admin/confirm-action-dialog";
 import { PublishedAtField } from "@/app/(admin)/admin/compose/post/published-at-field";
 import { PostRichTextEditor } from "@/app/(admin)/admin/compose/post/post-rich-text-editor";
 import { formatAdminDateTime } from "@/app/(admin)/admin/utils";
+import { highlightCodeBlocksInHtml } from "@/lib/code-highlighting";
 import { getRenderedContentHtml } from "@/lib/content";
 import { getRichTextPreviewTitle, parseStoredRichTextContent } from "@/lib/rich-text-content";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
@@ -166,7 +167,7 @@ function buildUpdatePreviewState(form: HTMLFormElement | null, authorName: strin
   const contentHtml = getFormValue(formData, "contentHtml") || null;
   const publishedAt = getFormValue(formData, "publishedAt");
   const title = getRichTextPreviewTitle(contentHtml, content, "未命名动态");
-  const body = contentHtml ?? getRenderedContentHtml(null, content) ?? "<p>暂无内容。</p>";
+  const body = highlightCodeBlocksInHtml(contentHtml ?? getRenderedContentHtml(null, content) ?? "<p>暂无内容。</p>");
   const formattedPublishedAt = publishedAt ? formatAdminDateTime(publishedAt) : null;
 
   return {

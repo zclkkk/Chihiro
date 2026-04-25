@@ -86,7 +86,7 @@ export type SiteHeaderRecentArchiveItem = {
   title: string;
   categoryLabel: string;
   publishedAt: string | null;
-  kind: "文章" | "动态";
+  kind: "篇章" | "足迹";
 };
 
 const morePlaceholders = [
@@ -1079,7 +1079,7 @@ function MegaNavRecentEntry({
   href: string;
   title: string;
   categoryLabel?: string;
-  kind?: "文章" | "动态";
+  kind?: "篇章" | "足迹";
   dateValue: string | null;
   compact?: boolean;
   onNavigate: () => void;
@@ -1105,7 +1105,7 @@ function MegaNavRecentEntry({
           <RelativeDate value={dateValue} />
         </span>
       </div>
-      {!compact && categoryLabel ? (
+      {!compact && categoryLabel && kind !== "足迹" ? (
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{categoryLabel}</p>
       ) : null}
     </Link>

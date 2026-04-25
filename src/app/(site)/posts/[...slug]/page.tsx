@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { PostTableOfContents } from "@/components/post-table-of-contents";
 import { PublicSiteUnavailableScreen } from "@/components/public-site-unavailable-screen";
+import { highlightCodeBlocksInHtml } from "@/lib/code-highlighting";
 import { addHeadingAnchors, getRenderedContentHtml } from "@/lib/content";
 import { getPostPath } from "@/lib/routes";
 import { RelativeDate } from "@/components/relative-date";
@@ -139,7 +140,9 @@ export default async function PostPage({ params }: PostPageProps) {
     }
 
     const renderedContentHtml = getRenderedContentHtml(post.contentHtml, post.content);
-    const contentWithToc = renderedContentHtml ? addHeadingAnchors(renderedContentHtml) : null;
+    const highlightedContentHtml = renderedContentHtml ? highlightCodeBlocksInHtml(renderedContentHtml) : null;
+    const contentWithToc = highlightedContentHtml ? addHeadingAnchors(highlightedContentHtml) : null;
+    const postContentHtml = contentWithToc?.html ?? highlightedContentHtml ?? "";
     const tocItems = contentWithToc?.items ?? [];
 
     return (
@@ -189,7 +192,7 @@ export default async function PostPage({ params }: PostPageProps) {
               <div
                 data-reading-progress-root
                 className="reading-copy mt-10 space-y-6 text-base leading-8 text-zinc-800 dark:text-zinc-200"
-                dangerouslySetInnerHTML={{ __html: contentWithToc?.html ?? renderedContentHtml }}
+                dangerouslySetInnerHTML={{ __html: postContentHtml }}
               />
             ) : (
               <div

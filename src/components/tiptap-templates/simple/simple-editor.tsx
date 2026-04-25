@@ -65,6 +65,7 @@ import { useIsBreakpoint } from "@/hooks/use-is-breakpoint"
 
 // --- Lib ---
 import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
+import { CodeBlockLowlightWithControls } from "@/lib/code-block-lowlight-with-controls"
 
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss"
@@ -228,12 +229,14 @@ export function SimpleEditor({
     },
     extensions: [
       StarterKit.configure({
+        codeBlock: false,
         horizontalRule: false,
         link: {
           openOnClick: false,
           enableClickSelection: true,
         },
       }),
+      CodeBlockLowlightWithControls,
       HorizontalRule,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       TaskList,
