@@ -70,9 +70,24 @@ export async function getPostByIdForAdmin(id: string): Promise<PostItem | null> 
   return mapPostRecord(data as unknown as PostRowWithRelations, revisions);
 }
 
-export async function listAllPublishedPosts(
-  options: { categorySlug?: string; tagSlugs?: string[]; query?: string } = {},
-): Promise<PostItem[]> {
+export async function getPublishedPostBySlug(slug: string): Promise<PostItem | null> {
+  const supabase = createAnonClient();
+
+  const { data, error } = await supabase
+    .from("posts")
+    .select(POST_SELECT)
+    .eq("status", "published")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return mapPublicPostRecord(data as unknown as PostRowWithRelations);
+}
+
+export async function listAllPublishedPosts(): Promise<PostItem[]> {
   const supabase = createAnonClient();
 
   const { data, error } = await supabase
@@ -85,38 +100,7 @@ export async function listAllPublishedPosts(
     throw error;
   }
 
-  let items = ((data ?? []) as unknown as PostRowWithRelations[]).map((post) => mapPublicPostRecord(post));
-
-  if (options.categorySlug) {
-    items = items.filter(
-      (item) => item.category?.slug === options.categorySlug || (!item.category && options.categorySlug === "uncategorized"),
-    );
-  }
-
-  if (options.tagSlugs && options.tagSlugs.length > 0) {
-    items = items.filter((item) =>
-      options.tagSlugs!.every((slug) => item.tags.some((tag) => tag.slug === slug)),
-    );
-  }
-
-  if (options.query) {
-    const q = options.query.toLowerCase();
-    items = items.filter((item) => {
-      const haystack = [
-        item.title,
-        item.summary ?? "",
-        item.contentHtml ?? "",
-        item.authorName ?? "",
-        item.category?.name ?? "",
-        ...item.tags.map((tag) => tag.name),
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }
-
-  return items;
+  return ((data ?? []) as unknown as PostRowWithRelations[]).map(mapPublicPostRecord);
 }
 
 export async function listPublishedPosts(
@@ -129,19 +113,91 @@ export async function listPublishedPosts(
     query?: string;
   } = {},
 ): Promise<PostListResult> {
+  const supabase = createAnonClient();
   const pageSize = getSafePageSize(options.pageSize);
   const page = getSafePage(options.page);
-  const allItems = await listAllPublishedPosts(options);
-  const sortedItems = sortPublishedPosts(allItems, options.sort);
-  const totalCount = sortedItems.length;
-  const paginatedItems = sortedItems.slice((page - 1) * pageSize, page * pageSize);
+
+  let queryBuilder = supabase
+    .from("posts")
+    .select(POST_SELECT, { count: "exact" })
+    .eq("status", "published");
+
+  if (options.categorySlug) {
+    if (options.categorySlug === "uncategorized") {
+      queryBuilder = queryBuilder.is("category_id", null);
+    } else {
+      const { data: catData } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("slug", options.categorySlug)
+        .maybeSingle();
+      if (!catData) {
+        return { items: [], page, pageSize, totalCount: 0, totalPages: 0 };
+      }
+      queryBuilder = queryBuilder.eq("category_id", catData.id);
+    }
+  }
+
+  if (options.tagSlugs && options.tagSlugs.length > 0) {
+    const { data: tagData } = await supabase
+      .from("tags")
+      .select("id")
+      .in("slug", options.tagSlugs);
+    if (!tagData || tagData.length === 0) {
+      return { items: [], page, pageSize, totalCount: 0, totalPages: 0 };
+    }
+    const tagIds = tagData.map((t) => t.id);
+    const { data: postTagData } = await supabase
+      .from("post_tags")
+      .select("post_id")
+      .in("tag_id", tagIds);
+    if (!postTagData || postTagData.length === 0) {
+      return { items: [], page, pageSize, totalCount: 0, totalPages: 0 };
+    }
+    const postTagCounts = new Map<string, number>();
+    for (const pt of postTagData) {
+      postTagCounts.set(pt.post_id, (postTagCounts.get(pt.post_id) ?? 0) + 1);
+    }
+    const matchingPostIds = [...postTagCounts.entries()]
+      .filter(([, count]) => count === tagIds.length)
+      .map(([id]) => id);
+    if (matchingPostIds.length === 0) {
+      return { items: [], page, pageSize, totalCount: 0, totalPages: 0 };
+    }
+    queryBuilder = queryBuilder.in("id", matchingPostIds);
+  }
+
+  if (options.query) {
+    const q = options.query.replace(/[%_]/g, "\\$&");
+    queryBuilder = queryBuilder.or(`title.ilike.%${q}%,summary.ilike.%${q}%`);
+  }
+
+  if (options.sort === "earliest") {
+    queryBuilder = queryBuilder.order("published_at", { ascending: true });
+  } else if (options.sort === "updated") {
+    queryBuilder = queryBuilder.order("updated_at", { ascending: false });
+  } else {
+    queryBuilder = queryBuilder.order("published_at", { ascending: false });
+  }
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  queryBuilder = queryBuilder.range(from, to);
+
+  const { data, error, count } = await queryBuilder;
+
+  if (error) {
+    throw error;
+  }
+
+  const items = ((data ?? []) as unknown as PostRowWithRelations[]).map(mapPublicPostRecord);
 
   return {
-    items: paginatedItems,
+    items,
     page,
     pageSize,
-    totalCount,
-    totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
+    totalCount: count ?? 0,
+    totalPages: Math.max(1, Math.ceil((count ?? 0) / pageSize)),
   };
 }
 
@@ -194,19 +250,6 @@ export async function listPublishedPostCategoriesForNavigation(
       title: p.title as string,
       slug: p.slug as string,
     })),
-  }));
-}
-
-export async function getPublishedPostSlugs(): Promise<string[]> {
-  const posts = await listAllPublishedPosts();
-  return posts.map((post) => post.slug);
-}
-
-export async function getPublishedPostRouteParams(): Promise<Array<{ category: string; slug: string }>> {
-  const posts = await listAllPublishedPosts();
-  return posts.map((post) => ({
-    category: post.category?.slug ?? "uncategorized",
-    slug: post.slug,
   }));
 }
 
@@ -370,9 +413,7 @@ export async function publishPostById(id: string): Promise<PostItem> {
 
     await supabase.from("post_revisions").delete().eq("post_id", id).eq("kind", "draft");
 
-    if (draftRevision.tagIds && draftRevision.tagIds.length > 0) {
-      await syncPostTags(supabase, id, draftRevision.tagIds);
-    }
+    await syncPostTags(supabase, id, draftRevision.tagIds ?? []);
 
     const tagsSnapshot = draftRevision.tagIds
       ? await fetchTagSnapshots(supabase, draftRevision.tagIds)
@@ -461,9 +502,7 @@ export async function discardPostRevisionById(id: string): Promise<PostItem> {
 
   await supabase.from("post_revisions").delete().eq("post_id", id).eq("kind", "draft");
 
-  if (publishedRevision.tagIds && publishedRevision.tagIds.length > 0) {
-    await syncPostTags(supabase, id, publishedRevision.tagIds);
-  }
+  await syncPostTags(supabase, id, publishedRevision.tagIds ?? []);
 
   const post = await getPostByIdForAdmin(id);
   if (!post) {
@@ -622,9 +661,9 @@ async function syncPostTags(supabase: SupabaseClient<Database>, postId: string, 
 
 function mapPostRecord(
   post: PostRowWithRelations,
-  revisions: Map<string, { hasDraft: boolean; hasPublished: boolean }>,
+  revisions?: Map<string, { hasDraft: boolean; hasPublished: boolean }>,
 ): PostItem {
-  const rev = revisions.get(post.id) ?? { hasDraft: false, hasPublished: false };
+  const rev = revisions?.get(post.id) ?? { hasDraft: false, hasPublished: false };
   return {
     id: post.id,
     title: post.title,
@@ -659,59 +698,8 @@ function mapPostRecord(
   };
 }
 
-function mapPublicPostRecord(
-  post: PostRowWithRelations,
-): PostItem {
-  return {
-    id: post.id,
-    title: post.title,
-    slug: post.slug,
-    summary: post.summary,
-    status: post.status as ContentStatus,
-    content: post.content,
-    contentHtml: post.content_html,
-    authorName: post.author_name,
-    publishedAt: post.published_at ?? null,
-    createdAt: post.created_at,
-    updatedAt: post.updated_at,
-    hasDraftRevision: false,
-    hasPublishedRevision: false,
-    category: post.category
-      ? { id: post.category.id, name: post.category.name, slug: post.category.slug }
-      : null,
-    coverAsset: post.cover_asset
-      ? {
-          id: post.cover_asset.id,
-          alt: post.cover_asset.alt,
-          mimeType: post.cover_asset.mime_type,
-          width: post.cover_asset.width,
-          height: post.cover_asset.height,
-        }
-      : null,
-    tags: (post.post_tags ?? []).map((pt) => ({
-      id: pt.tags.id,
-      name: pt.tags.name,
-      slug: pt.tags.slug,
-    })),
-  };
-}
-
-function sortPublishedPosts(items: PostItem[], sort: PostListSort = "latest") {
-  const nextItems = [...items];
-  if (sort === "earliest") {
-    nextItems.sort((a, b) => compareDates(a.publishedAt, b.publishedAt));
-  } else if (sort === "updated") {
-    nextItems.sort((a, b) => compareDates(b.updatedAt, a.updatedAt));
-  } else {
-    nextItems.sort((a, b) => compareDates(b.publishedAt, a.publishedAt));
-  }
-  return nextItems;
-}
-
-function compareDates(left?: string | null, right?: string | null) {
-  const leftTime = left ? new Date(left).getTime() : 0;
-  const rightTime = right ? new Date(right).getTime() : 0;
-  return leftTime - rightTime;
+function mapPublicPostRecord(post: PostRowWithRelations): PostItem {
+  return mapPostRecord(post);
 }
 
 function getSafePage(value?: number) {

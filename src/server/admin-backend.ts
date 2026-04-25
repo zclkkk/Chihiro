@@ -17,15 +17,11 @@ export async function getAdminBackendState(): Promise<AdminBackendState> {
     return { status: "missing_env" };
   }
 
-  try {
-    const installationState = await getInstallationState();
+  const installationState = await getInstallationState();
 
-    if (installationState.installed) {
-      return { status: "ready" };
-    }
-
-    return { status: "needs_installation" };
-  } catch {
-    return { status: "needs_installation" };
+  if (installationState.installed) {
+    return { status: "ready" };
   }
+
+  return { status: "needs_installation" };
 }

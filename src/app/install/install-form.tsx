@@ -163,13 +163,13 @@ export function InstallForm({ defaults, needsAdminSetup }: InstallFormProps) {
         <section className="grid gap-5 border-t border-zinc-200/80 pt-6 dark:border-zinc-800/80">
           {needsAdminSetup ? (
             <div className="grid gap-5 md:grid-cols-2">
-              <Field label="管理员邮箱" name="email" type="email" required placeholder="admin@example.com" />
+              <Field label="管理员邮箱" name="adminEmail" type="email" required placeholder="admin@example.com" />
               <Field label="管理员密码" name="password" type="password" required placeholder="至少 8 位" />
               <Field label="确认密码" name="confirmPassword" type="password" required placeholder="再次输入密码" />
             </div>
           ) : (
             <div className="rounded-[1.5rem] border border-zinc-200/80 bg-zinc-50/80 px-5 py-4 text-sm leading-7 text-zinc-600 dark:border-zinc-800/80 dark:bg-zinc-900/60 dark:text-zinc-300">
-              当前数据库里已经存在管理员帐号，这次安装不会重复创建管理员，只会更新站点信息并直接进入后台。
+              当前数据库里已经存在管理员帐号，这次安装不会重复创建管理员，只会更新站点信息并跳转到后台入口。
             </div>
           )}
         </section>

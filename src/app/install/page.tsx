@@ -52,7 +52,7 @@ export default async function InstallPage() {
             返回站点
           </Link>
           <span>·</span>
-          <span>初始化完成后会直接进入后台。</span>
+          <span>初始化完成后会前往后台入口。</span>
         </div>
       </main>
     );
@@ -107,7 +107,7 @@ export default async function InstallPage() {
           返回站点
         </Link>
         <span>·</span>
-        <span>初始化完成后会直接进入后台。</span>
+        <span>初始化完成后会前往后台入口。</span>
       </div>
     </main>
   );

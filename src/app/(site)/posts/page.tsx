@@ -8,7 +8,7 @@ import { PostTagsPanel } from "@/components/post-tags-panel";
 import { RelativeDate } from "@/components/relative-date";
 import { PostsPageContentSkeleton } from "@/components/site-route-skeletons";
 import { StaggerReveal, StaggerRevealItem } from "@/components/stagger-reveal";
-import { isPublicSiteUnavailableError, listPublicPosts } from "@/server/public-content";
+import { isPublicSiteUnavailableError, listPublicPosts, listPublicPostsPaginated } from "@/server/public-content";
 
 type PostsPageProps = {
   searchParams: Promise<{
@@ -69,10 +69,20 @@ async function PostsPageContent({
   activeSort: SortValue;
   currentPage: number;
 }) {
+  let postResult;
   let allPosts;
 
   try {
-    allPosts = await listPublicPosts();
+    [postResult, allPosts] = await Promise.all([
+      listPublicPostsPaginated({
+        page: currentPage,
+        pageSize: POSTS_PER_PAGE,
+        sort: activeSort,
+        categorySlug: category,
+        tagSlugs: selectedTags.length > 0 ? selectedTags : undefined,
+      }),
+      listPublicPosts(),
+    ]);
   } catch (error) {
     if (isPublicSiteUnavailableError(error)) {
       return <PublicSiteUnavailableScreen />;
@@ -81,32 +91,8 @@ async function PostsPageContent({
     throw error;
   }
 
-  const filteredPosts = allPosts.filter((post) => {
-    if (category === "uncategorized") {
-      if (post.category) {
-        return false;
-      }
-    } else if (category && post.category?.slug !== category) {
-      return false;
-    }
-
-    if (
-      selectedTags.length > 0 &&
-      !selectedTags.every((item) => post.tags.some((tagItem: { slug: string }) => tagItem.slug === item))
-    ) {
-      return false;
-    }
-
-    return true;
-  });
-
-  const publishedPosts = sortPosts(filteredPosts, activeSort);
-  const totalPages = Math.max(1, Math.ceil(publishedPosts.length / POSTS_PER_PAGE));
+  const { items: paginatedPosts, totalPages, totalCount } = postResult;
   const safeCurrentPage = Math.min(currentPage, totalPages);
-  const paginatedPosts = publishedPosts.slice(
-    (safeCurrentPage - 1) * POSTS_PER_PAGE,
-    safeCurrentPage * POSTS_PER_PAGE,
-  );
 
   const activeFilters = [
     ...(category ? [`Category: ${getCategoryFilterLabel(category, allPosts)}`] : []),
@@ -126,9 +112,9 @@ async function PostsPageContent({
       : []),
   ];
   const postsCountLabel =
-    publishedPosts.length === allPosts.length
+    totalCount === allPosts.length
       ? `${allPosts.length} posts total`
-      : `${publishedPosts.length} of ${allPosts.length} posts total`;
+      : `${totalCount} of ${allPosts.length} posts total`;
 
   const buildPostsHref = ({
     nextCategory = category,
@@ -212,7 +198,7 @@ async function PostsPageContent({
               })}
             </div>
           </StaggerRevealItem>
-          {publishedPosts.length > 0 ? (
+          {paginatedPosts.length > 0 ? (
             paginatedPosts.map((post) => (
               <StaggerRevealItem key={post.id}>
                 <article className="border-b border-zinc-200/80 pb-6 last:border-b-0 dark:border-zinc-800/80">
@@ -371,31 +357,6 @@ function getSortValue(value?: string): SortValue {
   }
 
   return "latest";
-}
-
-function sortPosts(posts: PublishedPost[], sort: SortValue) {
-  const nextPosts = [...posts];
-
-  if (sort === "earliest") {
-    nextPosts.sort((left, right) => comparePostDates(left.publishedAt, right.publishedAt));
-    return nextPosts;
-  }
-
-  if (sort === "updated") {
-    nextPosts.sort((left, right) =>
-      comparePostDates(right.updatedAt ?? right.publishedAt, left.updatedAt ?? left.publishedAt),
-    );
-    return nextPosts;
-  }
-
-  nextPosts.sort((left, right) => comparePostDates(right.publishedAt, left.publishedAt));
-  return nextPosts;
-}
-
-function comparePostDates(left: string | null | undefined, right: string | null | undefined) {
-  const leftTime = left ? new Date(left).getTime() : 0;
-  const rightTime = right ? new Date(right).getTime() : 0;
-  return leftTime - rightTime;
 }
 
 function getPageValue(value?: string) {

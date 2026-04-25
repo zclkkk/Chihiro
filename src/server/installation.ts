@@ -2,7 +2,6 @@ import "server-only";
 
 import { createClient as createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
-import { getSiteSettings } from "@/server/supabase/site";
 
 export type InstallationStatus = "needs_installation" | "ready";
 
@@ -23,31 +22,35 @@ export async function getInstallationState(): Promise<InstallationState> {
     };
   }
 
-  try {
-    const adminSupabase = createAdminClient();
+  const adminSupabase = createAdminClient();
 
-    const [adminResult, settings] = await Promise.all([
-      adminSupabase.from("admin_profiles").select("id", { count: "exact", head: true }),
-      getSiteSettings(),
-    ]);
+  const [adminResult, siteSettingsResult] = await Promise.all([
+    adminSupabase
+      .from("admin_profiles")
+      .select("id", { count: "exact", head: true }),
+    adminSupabase
+      .from("site_settings")
+      .select("id", { count: "exact", head: true })
+      .eq("id", "default"),
+  ]);
 
-    const adminUserCount = adminResult.count ?? 0;
-    const hasSiteSettings = Boolean(settings);
-
-    return {
-      installed: adminUserCount > 0 && hasSiteSettings,
-      status: adminUserCount > 0 && hasSiteSettings ? "ready" : "needs_installation",
-      adminUserCount,
-      hasSiteSettings,
-    };
-  } catch {
-    return {
-      installed: false,
-      status: "needs_installation",
-      adminUserCount: 0,
-      hasSiteSettings: false,
-    };
+  if (adminResult.error) {
+    throw adminResult.error;
   }
+
+  if (siteSettingsResult.error) {
+    throw siteSettingsResult.error;
+  }
+
+  const adminUserCount = adminResult.count ?? 0;
+  const hasSiteSettings = (siteSettingsResult.count ?? 0) > 0;
+
+  return {
+    installed: adminUserCount > 0 && hasSiteSettings,
+    status: adminUserCount > 0 && hasSiteSettings ? "ready" : "needs_installation",
+    adminUserCount,
+    hasSiteSettings,
+  };
 }
 
 export function isInstallationComplete(state: InstallationState) {

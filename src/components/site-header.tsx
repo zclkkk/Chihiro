@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { AdminLoginDialog } from "@/components/admin-login-dialog";
 import { logoutAction } from "@/app/(admin)/admin/login/actions";
+import { createClient } from "@/lib/supabase/browser";
 import { HeaderNav } from "@/components/header-nav";
 import { RelativeDate } from "@/components/relative-date";
 import { ThemeModeToggle } from "@/components/theme-mode-toggle";
@@ -90,7 +91,6 @@ const morePlaceholders = [
 
 type SiteHeaderProps = {
   siteName: string;
-  isAdminLoggedIn: boolean;
   adminDisplayName: string;
   adminAvatarUrl?: string | null;
   postCategories: SiteHeaderPostCategory[];
@@ -100,7 +100,6 @@ type SiteHeaderProps = {
 
 export function SiteHeader({
   siteName,
-  isAdminLoggedIn,
   adminDisplayName,
   adminAvatarUrl,
   postCategories,
@@ -110,6 +109,7 @@ export function SiteHeader({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileBrandVisible, setIsMobileBrandVisible] = useState(true);
   const [isMegaNavOpen, setIsMegaNavOpen] = useState(false);
@@ -129,6 +129,19 @@ export function SiteHeader({
   const lastScrollTopRef = useRef(0);
   const deferredIsScrolled = useDeferredValue(isScrolled);
   const STICKY_SCROLL_OFFSET = 24;
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from("admin_profiles")
+        .select("id")
+        .eq("id", user.id)
+        .maybeSingle()
+        .then(({ data }) => setIsAdminLoggedIn(!!data));
+    });
+  }, []);
 
   useEffect(() => {
     const getScrollTop = () =>

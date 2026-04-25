@@ -62,6 +62,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 2. `20260425000001_rls_policies.sql` — RLS 策略
 3. `20260425000002_storage_bucket.sql` — 存储桶与策略
 4. `20260425000003_rpcs.sql` — RPC 函数
+5. `20260425000004_revoke_admin_profiles_self_mutate.sql` — 收紧 admin_profiles 自修改策略
 
 ### 4. 生成数据库类型（可选）
 

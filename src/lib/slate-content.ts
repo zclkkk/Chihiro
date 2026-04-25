@@ -22,14 +22,6 @@ export function renderSlateContentHtml(value: SlateContentValue) {
   return value.map((node) => renderSlateNode(node)).join("");
 }
 
-export function serializeSlateContent(value: SlateContentValue) {
-  return value;
-}
-
-export function slateContentToText(value: SlateContentValue) {
-  return value.map((node) => extractSlateNodeText(node)).join(" ").replace(/\s+/g, " ").trim();
-}
-
 function deserializePlainTextToSlate(content: string): SlateContentValue {
   const blocks = content
     .split(/\n{2,}/)
@@ -144,18 +136,6 @@ function renderSlateTextNode(node: Text) {
   }
 
   return output;
-}
-
-function extractSlateNodeText(node: Descendant): string {
-  if (Text.isText(node)) {
-    return node.text;
-  }
-
-  if (!SlateElement.isElement(node)) {
-    return "";
-  }
-
-  return node.children.map((child) => extractSlateNodeText(child)).join("");
 }
 
 function escapeHtml(value: string) {

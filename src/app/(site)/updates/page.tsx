@@ -6,7 +6,7 @@ import { getUpdateAnchorPath } from "@/lib/routes";
 import { SearchDialog } from "@/components/search-dialog";
 import { UpdatesPageContentSkeleton } from "@/components/site-route-skeletons";
 import { StaggerReveal, StaggerRevealItem } from "@/components/stagger-reveal";
-import { isPublicSiteUnavailableError, listPublicUpdates } from "@/server/public-content";
+import { isPublicSiteUnavailableError, listPublicUpdates, listPublicUpdatesPaginated } from "@/server/public-content";
 
 type UpdatesPageProps = {
   searchParams: Promise<{
@@ -55,10 +55,18 @@ async function UpdatesPageContent({
   activeSort: SortValue;
   currentPage: number;
 }) {
+  let updateResult;
   let allUpdates;
 
   try {
-    allUpdates = await listPublicUpdates();
+    [updateResult, allUpdates] = await Promise.all([
+      listPublicUpdatesPaginated({
+        page: currentPage,
+        pageSize: UPDATES_PER_PAGE,
+        sort: activeSort,
+      }),
+      listPublicUpdates(),
+    ]);
   } catch (error) {
     if (isPublicSiteUnavailableError(error)) {
       return <PublicSiteUnavailableScreen />;
@@ -67,24 +75,20 @@ async function UpdatesPageContent({
     throw error;
   }
 
-  const sortedUpdates = sortUpdates(allUpdates, activeSort);
-  const totalPages = Math.max(1, Math.ceil(sortedUpdates.length / UPDATES_PER_PAGE));
+  const { items: paginatedUpdates, totalPages, totalCount } = updateResult;
   const safeCurrentPage = Math.min(currentPage, totalPages);
-  const paginatedUpdates = sortedUpdates.slice(
-    (safeCurrentPage - 1) * UPDATES_PER_PAGE,
-    safeCurrentPage * UPDATES_PER_PAGE,
-  );
-  const updatePageById = new Map<string, number>();
 
-  sortedUpdates.forEach((item, index) => {
+  const sortedAllUpdates = sortUpdates(allUpdates, activeSort);
+  const updatePageById = new Map<string, number>();
+  sortedAllUpdates.forEach((item, index) => {
     updatePageById.set(item.id, Math.floor(index / UPDATES_PER_PAGE) + 1);
   });
 
   const groups = groupUpdatesByYear(paginatedUpdates);
   const updatesCountLabel =
-    sortedUpdates.length === allUpdates.length
+    totalCount === allUpdates.length
       ? `${allUpdates.length} updates total`
-      : `${sortedUpdates.length} of ${allUpdates.length} updates total`;
+      : `${totalCount} of ${allUpdates.length} updates total`;
 
   const buildUpdatesHref = ({
     nextSort = activeSort,
@@ -293,6 +297,12 @@ function sortUpdates(updates: PublishedUpdate[], sort: SortValue) {
   return nextUpdates;
 }
 
+function compareUpdateDates(left: string | null | undefined, right: string | null | undefined) {
+  const leftTime = left ? new Date(left).getTime() : 0;
+  const rightTime = right ? new Date(right).getTime() : 0;
+  return leftTime - rightTime;
+}
+
 function groupUpdatesByYear(updates: PublishedUpdate[]) {
   const groups = new Map<string, PublishedUpdate[]>();
 
@@ -307,12 +317,6 @@ function groupUpdatesByYear(updates: PublishedUpdate[]) {
     year,
     items,
   }));
-}
-
-function compareUpdateDates(left: string | null | undefined, right: string | null | undefined) {
-  const leftTime = left ? new Date(left).getTime() : 0;
-  const rightTime = right ? new Date(right).getTime() : 0;
-  return leftTime - rightTime;
 }
 
 function formatFeedMonth(value: string | null) {
