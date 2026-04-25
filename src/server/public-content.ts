@@ -1,6 +1,5 @@
 import "server-only";
 
-import { hasAdminUsers, isAdminAuthenticated } from "@/server/auth";
 import { getInstallationState } from "@/server/installation";
 import { getSiteSettings } from "@/server/supabase/site";
 import { listAllPublishedPosts, getPublishedPostBySlug, listPublishedPosts } from "@/server/supabase/posts";
@@ -211,17 +210,6 @@ export async function listPublicRecentUpdateItems(
     publishedAt: item.publishedAt,
     kind: "动态" as const,
   }));
-}
-
-export async function getPublicAdminState() {
-  await assertInstalledPublicSite();
-
-  const [adminHasUsers, isAdminLoggedIn] = await Promise.all([
-    hasAdminUsers(),
-    isAdminAuthenticated(),
-  ]);
-
-  return { adminHasUsers, isAdminLoggedIn };
 }
 
 async function assertInstalledPublicSite() {

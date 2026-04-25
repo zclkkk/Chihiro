@@ -781,24 +781,6 @@ function mapPublicPostRecord(
   };
 }
 
-function sortPublishedPosts(items: PostItem[], sort: PostListSort = "latest") {
-  const nextItems = [...items];
-  if (sort === "earliest") {
-    nextItems.sort((a, b) => compareDates(a.publishedAt, b.publishedAt));
-  } else if (sort === "updated") {
-    nextItems.sort((a, b) => compareDates(b.updatedAt, a.updatedAt));
-  } else {
-    nextItems.sort((a, b) => compareDates(b.publishedAt, a.publishedAt));
-  }
-  return nextItems;
-}
-
-function compareDates(left?: string | null, right?: string | null) {
-  const leftTime = left ? new Date(left).getTime() : 0;
-  const rightTime = right ? new Date(right).getTime() : 0;
-  return leftTime - rightTime;
-}
-
 function getSafePage(value?: number) {
   if (!value || value < 1) return 1;
   return Math.floor(value);
