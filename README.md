@@ -56,13 +56,9 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 ### 3. 执行数据库迁移
 
-将 `supabase/migrations/` 下的 SQL 文件按顺序在 Supabase Dashboard 的 SQL Editor 中执行：
+在 Supabase Dashboard 的 SQL Editor 中执行初始化脚本：
 
-1. `20260425000000_initial_schema.sql` — 核心表结构与索引
-2. `20260425000001_rls_policies.sql` — RLS 策略
-3. `20260425000002_storage_bucket.sql` — 存储桶与策略
-4. `20260425000003_rpcs.sql` — RPC 函数
-5. `20260425000004_revoke_admin_profiles_self_mutate.sql` — 收紧 admin_profiles 自修改策略
+1. `supabase/migrations/20260425000000_init.sql` — 单文件初始化（表结构、索引、RLS、Storage 策略、RPC）
 
 ### 4. 生成数据库类型（可选）
 

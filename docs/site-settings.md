@@ -46,7 +46,7 @@
 
 代码入口：
 
-- 表结构：`supabase/migrations/20260425000000_initial_schema.sql`
+- 表结构：`supabase/migrations/20260425000000_init.sql`
 - 读取：`src/server/supabase/site.ts`
 - 后台保存：`src/app/(admin)/admin/settings/actions.ts`
 

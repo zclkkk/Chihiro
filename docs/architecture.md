@@ -26,7 +26,7 @@ Chihiro 第一阶段按：
 - 认证：`Supabase Auth`（email/password + SSR cookie）
 - 资源存储：`Supabase Storage`（`site-assets` 存储桶）
 - ORM / 数据访问：`@supabase/supabase-js` + `@supabase/ssr`，无 ORM 中间层
-- 数据库迁移：`supabase/migrations/*.sql`，远程 Supabase 项目执行
+- 数据库迁移：`supabase/migrations/20260425000000_init.sql`（单文件初始化），远程 Supabase 项目执行
 - 公开内容页：静态优先，采用 `ISR`
 - admin、编辑、上传、发布：动态处理
 
