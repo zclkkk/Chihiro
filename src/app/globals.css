@@ -251,10 +251,11 @@ body {
 
 .reading-copy .code-block-shell pre,
 .tiptap-editor .code-block-shell pre {
-  margin: 0;
+  margin: 0 1rem 1rem;
   border: 0;
-  border-radius: 0;
-  background: transparent;
+  border-radius: 0.55rem;
+  background: rgb(255 255 255 / 0.46);
+  padding: 0;
 }
 
 .reading-copy .code-block-toolbar,
@@ -334,6 +335,11 @@ body {
   color: inherit;
   font-size: inherit;
   line-height: inherit;
+}
+
+.reading-copy .code-block-shell pre code,
+.tiptap-editor .code-block-shell pre code {
+  padding: 0.85rem 1rem;
 }
 
 .reading-copy .hljs-comment,
@@ -505,6 +511,11 @@ html[data-theme="dark"] .tiptap-editor .code-block-toolbar {
   background: transparent;
 }
 
+html[data-theme="dark"] .reading-copy .code-block-shell pre,
+html[data-theme="dark"] .tiptap-editor .code-block-shell pre {
+  background: rgb(24 24 27 / 0.7);
+}
+
 html[data-theme="dark"] .reading-copy .code-block-language,
 html[data-theme="dark"] .tiptap-editor .code-block-language {
   color: rgb(230 237 243);
@@ -669,11 +680,11 @@ html[data-theme="dark"] .reading-copy hr {
 
 @keyframes hero-typewriter {
   from {
-    width: 0;
+    clip-path: inset(0 100% 0 0);
   }
 
   to {
-    width: calc(var(--hero-typewriter-steps, 13) * 1ch + var(--hero-typewriter-edge, 0.28ch));
+    clip-path: inset(0 0 0 0);
   }
 }
 
@@ -742,9 +753,10 @@ html[data-theme="dark"] .reading-copy hr {
 
 .hero-copy-typewriter-text {
   display: inline-block;
-  width: 0;
-  overflow: hidden;
+  width: auto;
+  overflow: visible;
   white-space: nowrap;
+  clip-path: inset(0 100% 0 0);
   animation: hero-typewriter 1.35s steps(var(--hero-typewriter-steps, 13), end) 0.95s forwards;
 }
 
