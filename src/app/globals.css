@@ -706,7 +706,7 @@ html[data-theme="dark"] .reading-copy hr {
   }
 
   to {
-    left: calc(100% - var(--hero-typewriter-edge, 0.28ch));
+    left: calc(100% - var(--hero-typewriter-caret-width, 0.58ch));
   }
 }
 
@@ -735,9 +735,10 @@ html[data-theme="dark"] .reading-copy hr {
 }
 
 .hero-copy-typewriter {
-  --hero-typewriter-edge: 0.28ch;
+  --hero-typewriter-caret-width: 0.58ch;
   position: relative;
   display: inline-grid;
+  padding-right: 0.72ch;
   vertical-align: baseline;
 }
 

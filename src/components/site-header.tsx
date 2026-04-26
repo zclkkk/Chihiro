@@ -119,7 +119,6 @@ export function SiteHeader({
   const searchParams = useSearchParams();
   const [isScrolled, setIsScrolled] = useState(false);
   const [stickyProgress, setStickyProgress] = useState(0);
-  const [isMobileBrandVisible, setIsMobileBrandVisible] = useState(true);
   const [isMegaNavOpen, setIsMegaNavOpen] = useState(false);
   const [highlightedHref, setHighlightedHref] = useState<string | null>(null);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -134,7 +133,6 @@ export function SiteHeader({
   const mobileMenuPanelRef = useRef<HTMLDivElement | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldRestoreStickyOffsetRef = useRef(false);
-  const lastScrollTopRef = useRef(0);
   const deferredIsScrolled = useDeferredValue(isScrolled);
   const STICKY_SCROLL_OFFSET = 24;
 
@@ -153,15 +151,6 @@ export function SiteHeader({
       setIsScrolled(nextScrollTop > 20);
       setStickyProgress(Number(nextStickyProgress.toFixed(3)));
 
-      if (nextScrollTop <= 20) {
-        setIsMobileBrandVisible(true);
-      } else if (nextScrollTop > lastScrollTopRef.current) {
-        setIsMobileBrandVisible(false);
-      } else if (nextScrollTop < lastScrollTopRef.current) {
-        setIsMobileBrandVisible(true);
-      }
-
-      lastScrollTopRef.current = nextScrollTop;
     };
 
     handleScroll();
@@ -291,6 +280,7 @@ export function SiteHeader({
   const headerTranslateY = topStateWeight * 4;
   const desktopHeaderTranslateY = topStateWeight * 10;
   const brandScale = 1 + topStateWeight * 0.08;
+  const isMobileBrandVisible = !isScrolled;
 
   const openAdminLogin = (next = "/admin") => {
     const params = new URLSearchParams(searchParams.toString());
@@ -341,7 +331,7 @@ export function SiteHeader({
             setIsMobileNavOpen(true);
             setExpandedMobileHref(activeItem.href);
           }}
-          className={`pointer-events-auto inline-flex shrink-0 items-center justify-center px-3 py-1.5 text-zinc-700 transition dark:text-zinc-200 md:hidden ${
+          className={`pointer-events-auto inline-flex h-10 w-10 shrink-0 items-center justify-center text-zinc-700 transition dark:text-zinc-200 md:hidden ${
             isScrolled
               ? "rounded-2xl border border-zinc-200/80 bg-white/80 shadow-sm dark:border-zinc-800/70 dark:bg-zinc-950/65 dark:backdrop-blur-xl dark:shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
               : "bg-transparent"
@@ -370,8 +360,8 @@ export function SiteHeader({
 
         <div
           ref={megaNavRef}
-          className="pointer-events-auto relative hidden transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] md:flex md:justify-center"
-          style={{ transform: `translateY(${desktopHeaderTranslateY}px)` }}
+          className="pointer-events-auto relative hidden transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] md:flex md:translate-y-[var(--site-header-desktop-offset)] md:justify-center"
+          style={{ "--site-header-desktop-offset": `${desktopHeaderTranslateY}px` } as CSSProperties}
           onMouseLeave={closeMegaNav}
           onFocusCapture={() => {
             if (!highlightedHref) {
@@ -426,8 +416,8 @@ export function SiteHeader({
         </div>
 
         <div
-          className="pointer-events-auto flex shrink-0 items-center gap-2 transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] md:justify-self-end"
-          style={{ transform: `translateY(${desktopHeaderTranslateY}px)` }}
+          className="pointer-events-auto flex shrink-0 items-center gap-2 transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] md:translate-y-[var(--site-header-desktop-offset)] md:justify-self-end"
+          style={{ "--site-header-desktop-offset": `${desktopHeaderTranslateY}px` } as CSSProperties}
         >
           <div className="hidden md:block">
             <ThemeModeToggle isScrolled={isScrolled} />
@@ -499,7 +489,7 @@ export function SiteHeader({
                 event.preventDefault();
                 openAdminLogin(adminLoginNext);
               }}
-              className={`inline-flex items-center justify-center rounded-2xl px-3 py-1.5 text-zinc-800 transition ${
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl text-zinc-800 transition md:h-auto md:w-auto md:px-3 md:py-1.5 ${
                 isScrolled
                   ? "border border-zinc-200/80 bg-white/80 shadow-sm hover:border-primary/30 hover:text-primary dark:border-zinc-800/70 dark:bg-zinc-950/65 dark:text-zinc-200 dark:backdrop-blur-xl dark:shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
                   : "border border-transparent bg-transparent hover:text-primary dark:text-zinc-200"
