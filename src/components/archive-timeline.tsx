@@ -117,8 +117,8 @@ export function ArchiveTimeline({ groups }: ArchiveTimelineProps) {
                         data-archive-year={group.year}
                         data-archive-month={monthGroup.month}
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="relative left-[-1.55rem] inline-flex h-3 w-3 shrink-0 rounded-full border border-white bg-primary shadow-[0_0_0_4px_rgba(255,255,255,0.9)] dark:border-zinc-950 dark:shadow-[0_0_0_4px_rgba(10,10,10,0.95)]" />
+                        <div className="relative flex items-center">
+                          <span className="absolute left-[-1.25rem] top-1/2 inline-flex h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary shadow-[0_0_0_4px_rgba(255,255,255,0.9)] dark:border-zinc-950 dark:shadow-[0_0_0_4px_rgba(10,10,10,0.95)] md:left-[-1.75rem]" />
                           <p className="text-sm font-medium tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
                             {monthGroup.month}
                           </p>
