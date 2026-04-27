@@ -58,7 +58,7 @@
   }
 
   // Selected node styles
-  .ProseMirror-selectednode:not(img):not(pre):not(.react-renderer) {
+  .ProseMirror-selectednode:not(img):not(pre):not(.react-renderer):not(.content-gallery--editor) {
     border-radius: var(--tt-radius-md);
     background-color: var(--tt-selection-color);
   }

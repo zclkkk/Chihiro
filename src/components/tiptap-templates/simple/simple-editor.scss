@@ -136,7 +136,7 @@ html[data-theme="dark"] .simple-editor-content .tiptap.ProseMirror.simple-editor
   border-top-color: rgb(39 39 42 / 0.9);
 }
 
-html[data-theme="dark"] .simple-editor-content .tiptap.ProseMirror.simple-editor .ProseMirror-selectednode:not(img):not(pre):not(.react-renderer) {
+html[data-theme="dark"] .simple-editor-content .tiptap.ProseMirror.simple-editor .ProseMirror-selectednode:not(img):not(pre):not(.react-renderer):not(.content-gallery--editor) {
   background-color: rgb(var(--primary-rgb) / 0.12);
 }
 
@@ -229,20 +229,27 @@ html[data-theme="dark"] .simple-editor-code-input::selection {
   gap: 0.375rem;
 }
 
-.simple-editor-secondary-toolbar {
+.simple-editor-shell {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.simple-editor-main-toolbar {
+  flex-wrap: nowrap;
+  min-height: var(--tt-toolbar-height);
+}
+
+.simple-editor-mode-toolbar {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 0.25rem;
-  min-height: 2.25rem;
-  padding: 0.25rem 0.5rem;
-  border-bottom: 1px solid var(--tt-toolbar-border-color);
-  background: var(--tt-toolbar-bg-color);
+  min-height: 1.75rem;
+  padding-right: 1.25rem;
 }
 
-html[data-theme="dark"] .simple-editor-secondary-toolbar {
-  background: var(--tt-toolbar-bg-color);
-  border-bottom-color: var(--tt-toolbar-border-color);
+html[data-theme="dark"] .simple-editor-mode-toolbar {
+  background: transparent;
 }
 
 .simple-editor-mode-switch {

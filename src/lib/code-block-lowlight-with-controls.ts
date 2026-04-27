@@ -2,9 +2,53 @@
 
 import type { NodeViewRendererProps } from "@tiptap/core";
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
+import { TextSelection } from "@tiptap/pm/state";
 import { CODE_LANGUAGE_OPTIONS, formatCodeLanguageLabel, syntaxLowlight } from "@/lib/code-highlighting";
 
 export const CodeBlockLowlightWithControls = CodeBlockLowlight.extend({
+  addKeyboardShortcuts() {
+    const parentShortcuts = this.parent?.() ?? {};
+
+    const insertParagraphAroundCodeBlock = (direction: "before" | "after") => {
+      const { state, view } = this.editor;
+      const { selection, schema } = state;
+      const { $from, empty } = selection;
+
+      if (!empty || $from.parent.type.name !== this.name) {
+        return false;
+      }
+
+      const isBefore = direction === "before";
+      const isAtBoundary = isBefore
+        ? $from.parentOffset === 0
+        : $from.parentOffset === $from.parent.content.size;
+
+      if (!isAtBoundary) {
+        return false;
+      }
+
+      const insertPosition = isBefore ? $from.before() : $from.after();
+      const paragraph = schema.nodes.paragraph?.create();
+
+      if (!paragraph) {
+        return false;
+      }
+
+      const tr = state.tr.insert(insertPosition, paragraph);
+      tr.setSelection(TextSelection.create(tr.doc, insertPosition + 1));
+      view.dispatch(tr.scrollIntoView());
+
+      return true;
+    };
+
+    return {
+      ...parentShortcuts,
+      ArrowUp: () => insertParagraphAroundCodeBlock("before"),
+      Backspace: () => insertParagraphAroundCodeBlock("before"),
+      ArrowDown: () => insertParagraphAroundCodeBlock("after"),
+    };
+  },
+
   addNodeView() {
     return (props: NodeViewRendererProps) => {
       const { editor, getPos, node } = props;

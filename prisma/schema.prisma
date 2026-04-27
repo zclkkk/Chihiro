@@ -86,6 +86,21 @@ model Asset {
   postCovers   Post[]        @relation("PostCoverAsset")
 }
 
+model ObjectStorageSettings {
+  id              String        @id @default("default")
+  provider        AssetProvider @default(R2)
+  endpoint        String?
+  region          String        @default("auto")
+  bucket          String
+  accessKeyId     String
+  secretAccessKey String
+  publicBaseUrl   String
+  keyPrefix       String?
+  forcePathStyle  Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
 model Category {
   id          Int          @id @default(autoincrement())
   kind        CategoryKind

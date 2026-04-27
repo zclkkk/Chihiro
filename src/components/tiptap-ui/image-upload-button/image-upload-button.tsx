@@ -38,6 +38,10 @@ export interface ImageUploadButtonProps
    * Optional custom icon component to render instead of the default.
    */
   icon?: React.MemoExoticComponent<IconComponent> | React.FC<IconProps>
+  /**
+   * Optional accessible label and tooltip.
+   */
+  label?: string
 }
 
 export function ImageShortcutBadge({
@@ -63,9 +67,11 @@ export const ImageUploadButton = forwardRef<
       text,
       hideWhenUnavailable = false,
       onInserted,
+      uploadOptions,
       showShortcut = false,
       onClick,
       icon: CustomIcon,
+      label: customLabel,
       children,
       ...buttonProps
     },
@@ -84,6 +90,7 @@ export const ImageUploadButton = forwardRef<
       editor,
       hideWhenUnavailable,
       onInserted,
+      uploadOptions,
     })
 
     const handleClick = useCallback(
@@ -100,6 +107,7 @@ export const ImageUploadButton = forwardRef<
     }
 
     const RenderIcon = CustomIcon ?? Icon
+    const buttonLabel = customLabel ?? label
 
     return (
       <Button
@@ -110,9 +118,9 @@ export const ImageUploadButton = forwardRef<
         tabIndex={-1}
         disabled={!canInsert}
         data-disabled={!canInsert}
-        aria-label={label}
+        aria-label={buttonLabel}
         aria-pressed={isActive}
-        tooltip={label}
+        tooltip={buttonLabel}
         onClick={handleClick}
         {...buttonProps}
         ref={ref}

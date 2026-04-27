@@ -25,6 +25,7 @@ import {
 } from "@/components/tiptap-ui-primitive/toolbar"
 
 // --- Tiptap Node ---
+import { GalleryNode } from "@/components/tiptap-node/gallery-node/gallery-node-extension"
 import { ImageUploadNode } from "@/components/tiptap-node/image-upload-node/image-upload-node-extension"
 import { HorizontalRule } from "@/components/tiptap-node/horizontal-rule-node/horizontal-rule-node-extension"
 import "@/components/tiptap-node/blockquote-node/blockquote-node.scss"
@@ -58,6 +59,7 @@ import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
 // --- Icons ---
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
 import { HighlighterIcon } from "@/components/tiptap-icons/highlighter-icon"
+import { ImagesIcon } from "@/components/tiptap-icons/images-icon"
 import { LinkIcon } from "@/components/tiptap-icons/link-icon"
 
 // --- Hooks ---
@@ -109,21 +111,29 @@ const MainToolbarContent = ({
         <MarkButton editor={editor} type="bold" />
         <MarkButton editor={editor} type="italic" />
         <MarkButton editor={editor} type="strike" />
-        <MarkButton editor={editor} type="code" />
         <MarkButton editor={editor} type="underline" />
+        {!isMobile ? <LinkPopover editor={editor} /> : <LinkButton onClick={onLinkClick} />}
+        <MarkButton editor={editor} type="code" />
         {!isMobile ? (
           <ColorHighlightPopover editor={editor} />
         ) : (
           <ColorHighlightPopoverButton onClick={onHighlighterClick} />
         )}
-        {!isMobile ? <LinkPopover editor={editor} /> : <LinkButton onClick={onLinkClick} />}
       </ToolbarGroup>
 
       <ToolbarSeparator />
 
       <ToolbarGroup>
-        <MarkButton editor={editor} type="superscript" />
-        <MarkButton editor={editor} type="subscript" />
+        <ImageUploadButton
+          editor={editor}
+          uploadOptions={{ limit: 1, outputType: "image" }}
+        />
+        <ImageUploadButton
+          editor={editor}
+          icon={ImagesIcon}
+          label="添加图册"
+          uploadOptions={{ limit: 12, outputType: "gallery" }}
+        />
       </ToolbarGroup>
 
       <ToolbarSeparator />
@@ -138,7 +148,8 @@ const MainToolbarContent = ({
       <ToolbarSeparator />
 
       <ToolbarGroup>
-        <ImageUploadButton editor={editor} text="Add" />
+        <MarkButton editor={editor} type="superscript" />
+        <MarkButton editor={editor} type="subscript" />
       </ToolbarGroup>
 
       {showThemeToggle ? (
@@ -243,13 +254,21 @@ export function SimpleEditor({
       TaskItem.configure({ nested: true }),
       Highlight.configure({ multicolor: true }),
       Image,
+      GalleryNode.configure({
+        accept: "image/*",
+        limit: 12,
+        maxSize: MAX_FILE_SIZE,
+        upload: handleImageUpload,
+        onError: (error) => console.error("Upload failed:", error),
+      }),
       Typography,
       Superscript,
       Subscript,
       ImageUploadNode.configure({
         accept: "image/*",
         maxSize: MAX_FILE_SIZE,
-        limit: 3,
+        limit: 1,
+        outputType: "image",
         upload: handleImageUpload,
         onError: (error) => console.error("Upload failed:", error),
       }),
@@ -311,58 +330,61 @@ export function SimpleEditor({
   }
 
   return (
-    <div className="simple-editor-wrapper">
-      <input type="hidden" name={contentFieldName} value={serializedContent} />
-      <input type="hidden" name={htmlFieldName} value={serializedHtml} />
-      <EditorContext.Provider value={{ editor }}>
-        {editor ? (
-          <div className="simple-editor-secondary-toolbar">
-            <ModeToggle isCodeView={isCodeView} onToggleCodeView={toggleCodeView} />
-          </div>
-        ) : null}
+    <div className="simple-editor-shell">
+      {editor ? (
+        <div className="simple-editor-mode-toolbar">
+          <ModeToggle isCodeView={isCodeView} onToggleCodeView={toggleCodeView} />
+        </div>
+      ) : null}
 
-        <Toolbar
-          ref={toolbarRef}
-        >
-          {!isCodeView && editor && activeMobileView === "main" ? (
-            <MainToolbarContent
-              editor={editor}
-              onHighlighterClick={() => setMobileView("highlighter")}
-              onLinkClick={() => setMobileView("link")}
-              isMobile={isMobile}
-              showThemeToggle={showThemeToggle}
-            />
-          ) : !isCodeView && editor ? (
-            <MobileToolbarContent
-              editor={editor}
-              type={activeMobileView === "highlighter" ? "highlighter" : "link"}
-              onBack={() => setMobileView("main")}
-            />
-          ) : null}
-        </Toolbar>
+      <div className="simple-editor-wrapper">
+        <input type="hidden" name={contentFieldName} value={serializedContent} />
+        <input type="hidden" name={htmlFieldName} value={serializedHtml} />
+        <EditorContext.Provider value={{ editor }}>
+          <Toolbar
+            ref={toolbarRef}
+            className="simple-editor-main-toolbar"
+          >
+            {!isCodeView && editor && activeMobileView === "main" ? (
+              <MainToolbarContent
+                editor={editor}
+                onHighlighterClick={() => setMobileView("highlighter")}
+                onLinkClick={() => setMobileView("link")}
+                isMobile={isMobile}
+                showThemeToggle={showThemeToggle}
+              />
+            ) : !isCodeView && editor ? (
+              <MobileToolbarContent
+                editor={editor}
+                type={activeMobileView === "highlighter" ? "highlighter" : "link"}
+                onBack={() => setMobileView("main")}
+              />
+            ) : null}
+          </Toolbar>
 
-        {isCodeView ? (
-          <div className="simple-editor-code-pane">
-            <textarea
-              value={codeValue}
-              onChange={(event) => syncCodeValue(event.target.value)}
-              wrap="soft"
-              spellCheck={false}
-              autoCapitalize="off"
-              autoCorrect="off"
-              autoComplete="off"
-              aria-label="Source code editor"
-              className="simple-editor-code-input"
+          {isCodeView ? (
+            <div className="simple-editor-code-pane">
+              <textarea
+                value={codeValue}
+                onChange={(event) => syncCodeValue(event.target.value)}
+                wrap="soft"
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
+                autoComplete="off"
+                aria-label="Source code editor"
+                className="simple-editor-code-input"
+              />
+            </div>
+          ) : (
+            <EditorContent
+              editor={editor}
+              role="presentation"
+              className="simple-editor-content"
             />
-          </div>
-        ) : (
-          <EditorContent
-            editor={editor}
-            role="presentation"
-            className="simple-editor-content"
-          />
-        )}
-      </EditorContext.Provider>
+          )}
+        </EditorContext.Provider>
+      </div>
     </div>
   )
 }

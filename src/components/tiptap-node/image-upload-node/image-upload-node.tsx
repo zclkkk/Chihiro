@@ -3,6 +3,7 @@
 import { useRef, useState } from "react"
 import type { NodeViewProps } from "@tiptap/react"
 import { NodeViewWrapper } from "@tiptap/react"
+import type { GalleryImage } from "@/components/tiptap-node/gallery-node/gallery-node-extension"
 import { Button } from "@/components/tiptap-ui-primitive/button"
 import { CloseIcon } from "@/components/tiptap-icons/close-icon"
 import "@/components/tiptap-node/image-upload-node/image-upload-node.scss"
@@ -284,7 +285,7 @@ interface ImageUploadDragAreaProps {
 /**
  * A component that creates a drag-and-drop area for image uploads
  */
-const ImageUploadDragArea: React.FC<ImageUploadDragAreaProps> = ({
+export const ImageUploadDragArea: React.FC<ImageUploadDragAreaProps> = ({
   onFile,
   children,
 }) => {
@@ -408,7 +409,7 @@ const ImageUploadPreview: React.FC<ImageUploadPreviewProps> = ({
   )
 }
 
-const DropZoneContent: React.FC<{ maxSize: number; limit: number }> = ({
+export const DropZoneContent: React.FC<{ maxSize: number; limit: number }> = ({
   maxSize,
   limit,
 }) => (
@@ -434,8 +435,10 @@ const DropZoneContent: React.FC<{ maxSize: number; limit: number }> = ({
 )
 
 export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
-  const { accept, limit, maxSize } = props.node.attrs
+  const { accept, limit, maxSize, outputType } = props.node.attrs
   const inputRef = useRef<HTMLInputElement>(null)
+  const [imageUrl, setImageUrl] = useState("")
+  const [imageUrlError, setImageUrlError] = useState<string | null>(null)
   const extension = props.extension
 
   const uploadOptions: UploadOptions = {
@@ -450,36 +453,88 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
   const { fileItems, uploadFiles, removeFileItem, clearAllFiles } =
     useFileUpload(uploadOptions)
 
+  const insertNodes = (
+    nodes: Array<{ type: string; attrs: Record<string, unknown> }>
+  ) => {
+    const pos = props.getPos()
+
+    if (!isValidPosition(pos)) {
+      return false
+    }
+
+    props.editor
+      .chain()
+      .focus()
+      .deleteRange({ from: pos, to: pos + props.node.nodeSize })
+      .insertContentAt(pos, nodes)
+      .run()
+
+    focusNextNode(props.editor)
+    return true
+  }
+
+  const buildInsertedNodes = (images: GalleryImage[]) => {
+    if (outputType === "gallery") {
+      return [
+        {
+          type: "gallery",
+          attrs: {
+            images,
+          },
+        },
+      ]
+    }
+
+    return images.map((image) => ({
+      type: extension.options.type,
+      attrs: {
+        src: image.src,
+        alt: image.alt,
+        title: image.title,
+      },
+    }))
+  }
+
   const handleUpload = async (files: File[]) => {
     const urls = await uploadFiles(files)
 
     if (urls.length > 0) {
-      const pos = props.getPos()
+      const uploadedImages = urls.map((url, index) => {
+        const filename =
+          files[index]?.name.replace(/\.[^/.]+$/, "") || "unknown"
+        return {
+          src: url,
+          alt: filename,
+          title: filename,
+        }
+      })
 
-      if (isValidPosition(pos)) {
-        const imageNodes = urls.map((url, index) => {
-          const filename =
-            files[index]?.name.replace(/\.[^/.]+$/, "") || "unknown"
-          return {
-            type: extension.options.type,
-            attrs: {
-              ...extension.options,
-              src: url,
-              alt: filename,
-              title: filename,
-            },
-          }
-        })
+      insertNodes(buildInsertedNodes(uploadedImages))
+    }
+  }
 
-        props.editor
-          .chain()
-          .focus()
-          .deleteRange({ from: pos, to: pos + props.node.nodeSize })
-          .insertContentAt(pos, imageNodes)
-          .run()
+  const handleImageUrlInsert = () => {
+    const normalizedUrl = normalizeImageUrl(imageUrl)
 
-        focusNextNode(props.editor)
-      }
+    if (!normalizedUrl) {
+      setImageUrlError("请输入有效的图片 URL。")
+      return
+    }
+
+    const filename = getImageNameFromUrl(normalizedUrl)
+    const success = insertNodes(
+      buildInsertedNodes([
+        {
+          src: normalizedUrl,
+          alt: filename,
+          title: filename,
+        },
+      ])
+    )
+
+    if (success) {
+      setImageUrl("")
+      setImageUrlError(null)
     }
   }
 
@@ -508,9 +563,51 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
       onClick={handleClick}
     >
       {!hasFiles && (
-        <ImageUploadDragArea onFile={handleUpload}>
-          <DropZoneContent maxSize={maxSize} limit={limit} />
-        </ImageUploadDragArea>
+        <div className="tiptap-image-upload-empty">
+          <ImageUploadDragArea onFile={handleUpload}>
+            <DropZoneContent maxSize={maxSize} limit={limit} />
+          </ImageUploadDragArea>
+
+          <div
+            className="tiptap-image-upload-url"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="tiptap-image-upload-url-divider">
+              <span>或粘贴已上传图片 URL</span>
+            </div>
+            <div className="tiptap-image-upload-url-row">
+              <input
+                type="url"
+                value={imageUrl}
+                onChange={(event) => {
+                  setImageUrl(event.target.value)
+                  setImageUrlError(null)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault()
+                    handleImageUrlInsert()
+                  }
+                }}
+                placeholder="https://img.example.com/uploads/image.webp"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={!imageUrl.trim()}
+                onClick={handleImageUrlInsert}
+              >
+                插入
+              </Button>
+            </div>
+            {imageUrlError ? (
+              <div className="tiptap-image-upload-url-error">{imageUrlError}</div>
+            ) : null}
+          </div>
+        </div>
       )}
 
       {hasFiles && (
@@ -551,4 +648,36 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
       />
     </NodeViewWrapper>
   )
+}
+
+function normalizeImageUrl(value: string) {
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return null
+  }
+
+  try {
+    const url = new URL(trimmed)
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return null
+    }
+
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+function getImageNameFromUrl(value: string) {
+  try {
+    const url = new URL(value)
+    const lastSegment = decodeURIComponent(url.pathname.split("/").filter(Boolean).at(-1) ?? "")
+    const filename = lastSegment.replace(/\.[^/.]+$/, "")
+
+    return filename || "图片"
+  } catch {
+    return "图片"
+  }
 }

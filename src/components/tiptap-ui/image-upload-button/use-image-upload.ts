@@ -16,6 +16,8 @@ import { ImagePlusIcon } from "@/components/tiptap-icons/image-plus-icon"
 
 export const IMAGE_UPLOAD_SHORTCUT_KEY = "mod+shift+i"
 
+export type ImageUploadOutputType = "image" | "gallery"
+
 /**
  * Configuration for the image upload functionality
  */
@@ -33,6 +35,15 @@ export interface UseImageUploadConfig {
    * Callback function called after a successful image insertion.
    */
   onInserted?: () => void
+  /**
+   * Attributes for the inserted image upload node.
+   */
+  uploadOptions?: {
+    accept?: string
+    limit?: number
+    maxSize?: number
+    outputType?: ImageUploadOutputType
+  }
 }
 
 /**
@@ -48,15 +59,32 @@ export function canInsertImage(editor: Editor | null): boolean {
 /**
  * Checks if image is currently active
  */
-export function isImageActive(editor: Editor | null): boolean {
+export function isImageActive(
+  editor: Editor | null,
+  outputType: ImageUploadOutputType = "image"
+): boolean {
   if (!editor || !editor.isEditable) return false
-  return editor.isActive("imageUpload")
+
+  if (outputType === "gallery") {
+    return (
+      editor.isActive("gallery") ||
+      editor.isActive("imageUpload", { outputType: "gallery" })
+    )
+  }
+
+  return (
+    editor.isActive("image") ||
+    editor.isActive("imageUpload", { outputType: "image" })
+  )
 }
 
 /**
  * Inserts an image in the editor
  */
-export function insertImage(editor: Editor | null): boolean {
+export function insertImage(
+  editor: Editor | null,
+  uploadOptions?: UseImageUploadConfig["uploadOptions"]
+): boolean {
   if (!editor || !editor.isEditable) return false
   if (!canInsertImage(editor)) return false
 
@@ -66,6 +94,7 @@ export function insertImage(editor: Editor | null): boolean {
       .focus()
       .insertContent({
         type: "imageUpload",
+        attrs: uploadOptions,
       })
       .run()
   } catch {
@@ -138,13 +167,14 @@ export function useImageUpload(config?: UseImageUploadConfig) {
     editor: providedEditor,
     hideWhenUnavailable = false,
     onInserted,
+    uploadOptions,
   } = config || {}
 
   const { editor } = useTiptapEditor(providedEditor)
   const isMobile = useIsBreakpoint()
   const [isVisible, setIsVisible] = useState<boolean>(true)
   const canInsert = canInsertImage(editor)
-  const isActive = isImageActive(editor)
+  const isActive = isImageActive(editor, uploadOptions?.outputType ?? "image")
 
   useEffect(() => {
     if (!editor) return
@@ -165,12 +195,12 @@ export function useImageUpload(config?: UseImageUploadConfig) {
   const handleImage = useCallback(() => {
     if (!editor) return false
 
-    const success = insertImage(editor)
+    const success = insertImage(editor, uploadOptions)
     if (success) {
       onInserted?.()
     }
     return success
-  }, [editor, onInserted])
+  }, [editor, onInserted, uploadOptions])
 
   useHotkeys(
     IMAGE_UPLOAD_SHORTCUT_KEY,
@@ -190,7 +220,7 @@ export function useImageUpload(config?: UseImageUploadConfig) {
     isActive,
     handleImage,
     canInsert,
-    label: "Add image",
+    label: uploadOptions?.outputType === "gallery" ? "添加图册" : "添加图片",
     shortcutKeys: IMAGE_UPLOAD_SHORTCUT_KEY,
     Icon: ImagePlusIcon,
   }

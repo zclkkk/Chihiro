@@ -363,7 +363,6 @@ export const handleImageUpload = async (
   onProgress?: (event: { progress: number }) => void,
   abortSignal?: AbortSignal
 ): Promise<string> => {
-  // Validate file
   if (!file) {
     throw new Error("No file provided")
   }
@@ -374,17 +373,72 @@ export const handleImageUpload = async (
     )
   }
 
-  // For demo/testing: Simulate upload progress. In production, replace the following code
-  // with your own upload implementation.
-  for (let progress = 0; progress <= 100; progress += 10) {
-    if (abortSignal?.aborted) {
-      throw new Error("Upload cancelled")
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    onProgress?.({ progress })
+  if (abortSignal?.aborted) {
+    throw new Error("Upload cancelled")
   }
 
-  return "/images/tiptap-ui-placeholder-image.jpg"
+  const formData = new FormData()
+  formData.set("file", file)
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+
+    const handleAbort = () => {
+      xhr.abort()
+      reject(new Error("Upload cancelled"))
+    }
+
+    abortSignal?.addEventListener("abort", handleAbort, { once: true })
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) {
+        return
+      }
+
+      onProgress?.({
+        progress: Math.min(99, Math.round((event.loaded / event.total) * 100)),
+      })
+    }
+
+    xhr.onload = () => {
+      abortSignal?.removeEventListener("abort", handleAbort)
+
+      try {
+        const payload = JSON.parse(xhr.responseText || "{}") as {
+          url?: string
+          error?: string
+        }
+
+        if (xhr.status < 200 || xhr.status >= 300) {
+          reject(new Error(payload.error ?? "Upload failed"))
+          return
+        }
+
+        if (!payload.url) {
+          reject(new Error("Upload failed: No URL returned"))
+          return
+        }
+
+        onProgress?.({ progress: 100 })
+        resolve(payload.url)
+      } catch {
+        reject(new Error("Upload failed: Invalid server response"))
+      }
+    }
+
+    xhr.onerror = () => {
+      abortSignal?.removeEventListener("abort", handleAbort)
+      reject(new Error("Upload failed"))
+    }
+
+    xhr.onabort = () => {
+      abortSignal?.removeEventListener("abort", handleAbort)
+      reject(new Error("Upload cancelled"))
+    }
+
+    xhr.open("POST", "/api/admin/assets/images")
+    xhr.send(formData)
+  })
 }
 
 type ProtocolOptions = {
