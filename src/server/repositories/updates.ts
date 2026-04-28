@@ -327,28 +327,7 @@ function mapUpdateRecord(record: UpdateRecord): UpdateItem {
 }
 
 async function fetchUpdateRowById(id: number) {
-  const rows = await prisma.$queryRaw<Array<{
-    id: number;
-    title: string;
-    authorId: string | null;
-    authorName: string | null;
-    status: ContentStatus;
-    content: Prisma.JsonValue | null;
-    contentHtml: string | null;
-    publishedAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-    draftSnapshot: Prisma.JsonValue | null;
-  }>>(
-    Prisma.sql`
-      SELECT id, title, "authorId", "authorName", status, content, "contentHtml", "publishedAt", "createdAt", "updatedAt", "draftSnapshot"
-      FROM "Update"
-      WHERE id = ${id}
-      LIMIT 1
-    `,
-  );
-
-  return rows[0] ?? null;
+  return prisma.update.findUnique({ where: { id } });
 }
 
 async function fetchPublishedUpdateRows(
@@ -357,50 +336,22 @@ async function fetchPublishedUpdateRows(
   page?: number,
   where?: Prisma.UpdateWhereInput,
 ) {
-  const orderBySql =
-    sort === "earliest"
-      ? Prisma.sql`ORDER BY "publishedAt" ASC, "createdAt" ASC`
-      : sort === "updated"
-        ? Prisma.sql`ORDER BY "updatedAt" DESC`
-        : Prisma.sql`ORDER BY "publishedAt" DESC, "createdAt" DESC`;
+  const effectiveWhere = where ?? { status: ContentStatus.PUBLISHED };
 
-  const whereSql = buildPublishedUpdateWhereSql(where);
-  const limitSql = typeof pageSize === "number" ? Prisma.sql`LIMIT ${pageSize}` : Prisma.empty;
-  const offsetSql =
-    typeof pageSize === "number" && typeof page === "number"
-      ? Prisma.sql`OFFSET ${(page - 1) * pageSize}`
-      : Prisma.empty;
-
-  return prisma.$queryRaw<Array<{
-    id: number;
-    title: string;
-    authorId: string | null;
-    authorName: string | null;
-    status: ContentStatus;
-    content: Prisma.JsonValue | null;
-    contentHtml: string | null;
-    publishedAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-    draftSnapshot: Prisma.JsonValue | null;
-  }>>(
-    Prisma.sql`
-      SELECT id, title, "authorId", "authorName", status, content, "contentHtml", "publishedAt", "createdAt", "updatedAt", "draftSnapshot"
-      FROM "Update"
-      ${whereSql}
-      ${orderBySql}
-      ${limitSql}
-      ${offsetSql}
-    `,
-  );
+  return prisma.update.findMany({
+    where: effectiveWhere,
+    orderBy: getUpdateOrderBy(sort),
+    ...(typeof pageSize === "number" ? { take: pageSize } : {}),
+    ...(typeof pageSize === "number" && typeof page === "number"
+      ? { skip: (page - 1) * pageSize }
+      : {}),
+  });
 }
 
-function buildPublishedUpdateWhereSql(where?: Prisma.UpdateWhereInput) {
-  if (!where) {
-    return Prisma.sql`WHERE status = ${ContentStatus.PUBLISHED}`;
-  }
-
-  return Prisma.sql`WHERE status = ${ContentStatus.PUBLISHED}`;
+function getUpdateOrderBy(sort?: UpdateListSort): Prisma.UpdateOrderByWithRelationInput[] {
+  if (sort === "earliest") return [{ publishedAt: "asc" }, { createdAt: "asc" }];
+  if (sort === "updated") return [{ updatedAt: "desc" }];
+  return [{ publishedAt: "desc" }, { createdAt: "desc" }];
 }
 
 function getSafePage(value?: number) {
