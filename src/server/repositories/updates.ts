@@ -57,13 +57,9 @@ export type ListPublishedUpdatesOptions = {
 };
 
 export async function listUpdatesForAdmin(): Promise<UpdateItem[]> {
-  const items = await fetchUpdateRows(
-    `
-      SELECT id, title, "authorId", "authorName", status, content, "contentHtml", "publishedAt", "createdAt", "updatedAt", "draftSnapshot"
-      FROM "Update"
-      ORDER BY "updatedAt" DESC, "createdAt" DESC
-    `,
-  );
+  const items = await prisma.update.findMany({
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+  });
 
   return items.map(mapUpdateRecord);
 }
@@ -328,22 +324,6 @@ function mapUpdateRecord(record: UpdateRecord): UpdateItem {
     updatedAt: record.updatedAt.toISOString(),
     draftSnapshot: parseDraftSnapshot(record.draftSnapshot),
   };
-}
-
-async function fetchUpdateRows(sql: string) {
-  return prisma.$queryRaw<Array<{
-    id: number;
-    title: string;
-    authorId: string | null;
-    authorName: string | null;
-    status: ContentStatus;
-    content: Prisma.JsonValue | null;
-    contentHtml: string | null;
-    publishedAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-    draftSnapshot: Prisma.JsonValue | null;
-  }>>(Prisma.sql([sql]));
 }
 
 async function fetchUpdateRowById(id: number) {
