@@ -7,7 +7,7 @@
 - 富文本内容编辑
 - SEO 基础优化
 - RSS 订阅输出
-- 对象存储资源管理
+- Supabase Storage 资源管理
 
 当前项目还处在第一阶段，重点是先把公开站点、内容模型和后台发布链路搭稳。
 
@@ -18,34 +18,22 @@
 - TypeScript
 - Tailwind CSS 4
 - App Router
-- Postgres
+- Supabase Postgres
 - Prisma
-- S3 / R2 类对象存储
+- Supabase Auth
+- Supabase Storage
 
-## 本地启动
+## 本地开发
+
+需要一个 Supabase 项目（Free 即可）。复制 `.env.example` 为 `.env`，填入 Supabase Dashboard 取到的连接串、密钥与 bucket 信息，然后：
 
 ```bash
 npm install
+npx prisma migrate deploy
 npm run dev
 ```
 
-默认访问地址：
-
-```text
-http://localhost:3000
-```
-
-## 本地数据库
-
-项目已经接入 `Prisma`，本地开发需要先准备一个可用的 PostgreSQL 数据库，并在 `.env` 中设置 `DATABASE_URL`：
-  
-```bash
-DATABASE_URL="postgresql://username:password@127.0.0.1:5432/chihiro?schema=public"
-npm run db:push
-npm run db:generate
-```
-
-完成后即可启动开发服务器。
+打开 `http://localhost:3000/install` 填站点信息与管理员邮箱、密码，完成首次安装。
 
 ## 文档索引
 

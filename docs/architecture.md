@@ -22,9 +22,9 @@ Chihiro 第一阶段按：
 
 当前已经确认：
 
-- 数据库：`Postgres`
-- ORM：`Prisma`
-- 资源存储：`S3 / R2` 类对象存储
+- 数据库：Supabase Postgres + Prisma（service role bypass RLS）
+- 资源存储：Supabase Storage 原生 SDK
+- 鉴权：Supabase Auth，admin 标识用 `app_metadata.role`
 - 公开内容页：静态优先，采用 `ISR`
 - admin、编辑、上传、发布：动态处理
 
@@ -218,7 +218,7 @@ type Post = {
 
 推荐做法：
 
-- 文件上传到 `S3 / R2`
+- 文件上传到 Supabase Storage
 - 数据库保存 `Asset` 记录
 - 正文中的图片或视频节点引用 `assetId` 或资源 URL
 
@@ -252,4 +252,4 @@ type Post = {
 
 Chihiro 当前的正确方向可以概括成一句话：
 
-**使用 `Postgres + Prisma + S3/R2` 作为内容基础设施，公开页采用 ISR，后台走动态渲染，先完成普通内容的发布链路，再扩展编辑器和嵌入能力。**
+**使用 `Supabase Postgres + Prisma + Supabase Storage + Supabase Auth` 作为内容基础设施，公开页采用 ISR，后台走动态渲染，先完成普通内容的发布链路，再扩展编辑器和嵌入能力。**
