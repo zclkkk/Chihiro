@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { siteConfig } from "@/lib/site";
+import { getOptionalString } from "@/lib/form-helpers";
 import { isDatabaseUnavailableError } from "@/server/database-errors";
 import { getInstallationState, type InstallationStatus } from "@/server/installation";
 import { upsertSiteSettings } from "@/server/repositories/site";
@@ -25,11 +26,11 @@ export async function initializeSiteAction(
     return { error: stateErrorMessage(installationState.status) };
   }
 
-  const siteName = getRequiredString(formData, "siteName");
-  const siteDescription = getRequiredString(formData, "siteDescription");
-  const siteUrl = getValidatedUrl(getRequiredString(formData, "siteUrl"));
+  const siteName = getOptionalString(formData, "siteName") ?? "";
+  const siteDescription = getOptionalString(formData, "siteDescription") ?? "";
+  const siteUrl = getValidatedUrl(getOptionalString(formData, "siteUrl") ?? "");
   const locale = getOptionalString(formData, "locale") || siteConfig.locale;
-  const authorName = getRequiredString(formData, "authorName");
+  const authorName = getOptionalString(formData, "authorName") ?? "";
   const authorAvatarUrl = getOptionalImageSource(formData, "authorAvatarUrl");
   const heroIntro = getOptionalString(formData, "heroIntro");
   const summary = getOptionalString(formData, "summary");
@@ -44,8 +45,8 @@ export async function initializeSiteAction(
 
   try {
     if (!installationState.hasAdminUser) {
-      const adminEmail = normalizeEmail(getRequiredString(formData, "adminEmail"));
-      const adminPassword = getRequiredString(formData, "adminPassword");
+      const adminEmail = normalizeEmail(getOptionalString(formData, "adminEmail") ?? "");
+      const adminPassword = getOptionalString(formData, "adminPassword") ?? "";
 
       if (!adminEmail) {
         return { error: "请填写有效的管理员邮箱。" };
@@ -115,19 +116,6 @@ function stateErrorMessage(status: Exclude<InstallationStatus, "ready">) {
     case "schema_missing":
       return "数据库表结构还没有初始化，请先运行 npx prisma migrate deploy。";
   }
-}
-
-function getRequiredString(formData: FormData, key: string) {
-  const value = formData.get(key);
-  if (typeof value !== "string" || !value.trim()) return "";
-  return value.trim();
-}
-
-function getOptionalString(formData: FormData, key: string) {
-  const value = formData.get(key);
-  if (typeof value !== "string") return null;
-  const normalized = value.trim();
-  return normalized ? normalized : null;
 }
 
 function getValidatedUrl(value: string) {

@@ -1,5 +1,6 @@
 import { getPostPath } from "@/lib/routes";
 import { canonicalUrl } from "@/lib/site";
+import { escapeXml } from "@/lib/xml";
 import {
   getPublicSiteSettings,
   isPublicSiteUnavailableError,
@@ -71,13 +72,4 @@ ${urls
       "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400",
     },
   });
-}
-
-function escapeXml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
 }

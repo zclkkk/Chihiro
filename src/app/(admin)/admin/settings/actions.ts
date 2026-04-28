@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdminSession } from "@/server/auth";
 import { getSiteSettings, upsertSiteSettings } from "@/server/repositories/site";
 import { isSiteUrlLockedByEnv, siteConfig } from "@/lib/site";
+import { getOptionalString, getRequiredString } from "@/lib/form-helpers";
 
 export type SaveGeneralSettingsState = {
   error: string | null;
@@ -73,27 +74,6 @@ export async function saveGeneralSettingsAction(
     error: null,
     success: "常规设置已更新。",
   };
-}
-
-function getRequiredString(formData: FormData, key: string, label: string) {
-  const value = getOptionalString(formData, key);
-
-  if (!value) {
-    throw new Error(`请填写${label}。`);
-  }
-
-  return value;
-}
-
-function getOptionalString(formData: FormData, key: string) {
-  const value = formData.get(key);
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const normalized = value.trim();
-  return normalized ? normalized : null;
 }
 
 function parseUrl(value: string, label: string) {

@@ -1,11 +1,14 @@
 "use server";
 
-import { ContentStatus, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getPostPath } from "@/lib/routes";
 import { parseStoredRichTextContent } from "@/lib/rich-text-content";
+import { getContentStatus, getOptionalNumber, getOptionalString, getRequiredString } from "@/lib/form-helpers";
+import { parsePublishedAtInput } from "@/lib/date-parse";
+import { isUniqueConstraintError } from "@/lib/prisma-errors";
 import { getCurrentAdmin, requireAdminSession } from "@/server/auth";
+import { revalidatePostSurface } from "@/server/revalidation";
 import {
   discardPostRevisionById,
   getPostByIdForAdmin,
@@ -77,7 +80,7 @@ export async function savePostDraftAction(
     revalidatePath("/admin/workbench");
     revalidatePath("/admin/compose/post");
   } catch (error) {
-    if (isUniqueSlugError(error)) {
+    if (isUniqueConstraintError(error)) {
       return {
         error: "这个 slug 已经被占用了，请换一个。",
       };
@@ -119,63 +122,16 @@ export async function discardPostRevisionAction(formData: FormData) {
 
   redirect(`/admin/compose/post?id=${encodeURIComponent(restoredPost.id)}`);
 }
-
-function getRequiredString(formData: FormData, key: string) {
-  const value = getOptionalString(formData, key);
-
-  if (!value) {
-    throw new Error(`请填写 ${key}。`);
-  }
-
-  return value;
-}
-
 function getRequiredPostId(formData: FormData, key: string) {
   const value = getOptionalPostId(formData, key);
-
-  if (value === null) {
-    throw new Error(`请填写 ${key}。`);
-  }
-
+  if (value === null) throw new Error(`请填写${key}。`);
   return value;
-}
-
-function getOptionalString(formData: FormData, key: string) {
-  const value = formData.get(key);
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const normalized = value.trim();
-  return normalized ? normalized : null;
 }
 
 function getOptionalPostId(formData: FormData, key: string) {
   const value = getOptionalString(formData, key);
-
-  if (!value) {
-    return null;
-  }
-
-  if (!/^\d+$/.test(value)) {
-    throw new Error("请填写有效的文章编号。");
-  }
-
-  return Number(value);
-}
-
-function getOptionalNumber(formData: FormData, key: string) {
-  const value = getOptionalString(formData, key);
-
-  if (!value) {
-    return null;
-  }
-
-  if (!/^\d+$/.test(value)) {
-    throw new Error(`请填写有效的 ${key}。`);
-  }
-
+  if (!value) return null;
+  if (!/^\d+$/.test(value)) throw new Error("请填写有效的文章编号。");
   return Number(value);
 }
 
@@ -194,13 +150,6 @@ function parseRichTextContent(formData: FormData) {
 
   return parsed;
 }
-
-function getContentStatus(formData: FormData, key: string): ContentStatus {
-  const value = getOptionalString(formData, key);
-
-  return value === ContentStatus.PUBLISHED ? ContentStatus.PUBLISHED : ContentStatus.DRAFT;
-}
-
 function normalizeSlug(value: string) {
   const slug = value
     .toLowerCase()
@@ -216,52 +165,3 @@ function normalizeSlug(value: string) {
   return slug;
 }
 
-function parsePublishedAtInput(value: string) {
-  const match = value.match(
-    /^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})$/,
-  );
-
-  if (!match) {
-    throw new Error("请填写有效的发布日期。");
-  }
-
-  const [, year, month, day, hour, minute] = match;
-  const date = new Date(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-  );
-
-  if (
-    date.getFullYear() !== Number(year) ||
-    date.getMonth() !== Number(month) - 1 ||
-    date.getDate() !== Number(day) ||
-    date.getHours() !== Number(hour) ||
-    date.getMinutes() !== Number(minute)
-  ) {
-    throw new Error("请填写有效的发布日期。");
-  }
-
-  return date;
-}
-
-function isUniqueSlugError(error: unknown) {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
-  );
-}
-
-function revalidatePostSurface(slug: string, categorySlug?: string | null) {
-  revalidatePath("/admin");
-  revalidatePath("/admin/workbench");
-  revalidatePath("/");
-  revalidatePath("/timeline");
-  revalidatePath("/posts");
-  revalidatePath(getPostPath({ slug, categorySlug }));
-  revalidatePath(`/posts/${slug}`);
-  revalidatePath("/rss.xml");
-  revalidatePath("/sitemap.xml");
-}

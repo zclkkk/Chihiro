@@ -1,6 +1,7 @@
 import { getContentText } from "@/lib/content";
 import { getPostPath } from "@/lib/routes";
 import { canonicalUrl, siteConfig } from "@/lib/site";
+import { escapeXml } from "@/lib/xml";
 import {
   getPublicSiteSettings,
   isPublicSiteUnavailableError,
@@ -83,13 +84,4 @@ export async function GET() {
       "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400",
     },
   });
-}
-
-function escapeXml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
 }
