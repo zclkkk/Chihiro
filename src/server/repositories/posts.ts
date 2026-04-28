@@ -291,8 +291,7 @@ export async function listPublishedPosts(
   const page = getSafePage(options.page);
   const items = await listAllPublishedPosts(options);
   const totalCount = items.length;
-  const sortedItems = sortPublishedPosts(items, options.sort);
-  const paginatedItems = sortedItems.slice((page - 1) * pageSize, page * pageSize);
+  const paginatedItems = items.slice((page - 1) * pageSize, page * pageSize);
 
   return {
     items: paginatedItems,
@@ -306,11 +305,17 @@ export async function listPublishedPosts(
 export async function listAllPublishedPosts(
   options: Omit<ListPublishedPostsOptions, "page" | "pageSize"> = {},
 ): Promise<PostItem[]> {
+  const where: Prisma.PostWhereInput = {
+    status: ContentStatus.PUBLISHED,
+    ...(options.categorySlug
+      ? { category: { slug: options.categorySlug } }
+      : {}),
+  };
+
   const records = await prisma.post.findMany({
-    where: {
-      status: ContentStatus.PUBLISHED,
-    },
+    where,
     include: postInclude,
+    orderBy: getPostOrderBy(options.sort),
   });
 
   const items = records.map(mapPublishedPostRecord);
@@ -443,10 +448,12 @@ export async function listPublishedPostCategoriesForNavigation(
 }
 
 export async function getPublishedPostBySlug(slug: string): Promise<PostItem | null> {
-  const post = await listAllPublishedPosts();
-  const found = post.find((item) => item.slug === slug);
+  const record = await prisma.post.findFirst({
+    where: { slug, status: ContentStatus.PUBLISHED },
+    include: postInclude,
+  });
 
-  return found ?? null;
+  return record ? mapPublishedPostRecord(record) : null;
 }
 
 export async function getPublishedPostByCategoryAndSlug(
@@ -658,15 +665,21 @@ export async function unpublishPostById(id: number): Promise<PostItem> {
 }
 
 export async function getPublishedPostSlugs(): Promise<string[]> {
-  const posts = await listAllPublishedPosts();
+  const records = await prisma.post.findMany({
+    where: { status: ContentStatus.PUBLISHED },
+    select: { slug: true },
+  });
 
-  return posts.map((post) => post.slug);
+  return records.map((record) => record.slug);
 }
 
 export async function getPublishedPostRouteParams(): Promise<Array<{ category: string; slug: string }>> {
-  const posts = await listAllPublishedPosts();
+  const records = await prisma.post.findMany({
+    where: { status: ContentStatus.PUBLISHED },
+    select: { slug: true, category: { select: { slug: true } } },
+  });
 
-  return posts.map((post) => ({
+  return records.map((post) => ({
     category: post.category?.slug ?? "uncategorized",
     slug: post.slug,
   }));
@@ -723,26 +736,6 @@ function filterPublishedPosts(
     return true;
   });
 }
-
-function sortPublishedPosts(items: PostItem[], sort: PostListSort = "latest") {
-  const nextItems = [...items];
-
-  if (sort === "earliest") {
-    nextItems.sort((left, right) => comparePostDates(left.publishedAt, right.publishedAt));
-    return nextItems;
-  }
-
-  if (sort === "updated") {
-    nextItems.sort((left, right) =>
-      comparePostDates(right.updatedAt ?? right.publishedAt, left.updatedAt ?? left.publishedAt),
-    );
-    return nextItems;
-  }
-
-  nextItems.sort((left, right) => comparePostDates(right.publishedAt, left.publishedAt));
-  return nextItems;
-}
-
 function mapPostRecord(record: PostRecord): PostItem {
   return {
     id: record.id,
@@ -925,14 +918,6 @@ function parseDraftSnapshot(value: Prisma.JsonValue | null): DraftPostSnapshot |
     tags: Array.isArray(snapshot.tags) ? snapshot.tags : [],
   };
 }
-
-function comparePostDates(left?: string | null, right?: string | null) {
-  const leftTime = left ? new Date(left).getTime() : 0;
-  const rightTime = right ? new Date(right).getTime() : 0;
-
-  return leftTime - rightTime;
-}
-
 function getSafePage(value?: number) {
   if (!value || value < 1) {
     return 1;
