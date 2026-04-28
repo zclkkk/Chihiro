@@ -30,6 +30,9 @@ function getPrismaClient() {
     globalForPrisma.pool ??
     new Pool({
       connectionString,
+      max: Number(process.env.DATABASE_POOL_MAX ?? 5),
+      idleTimeoutMillis: 30_000,
+      keepAlive: true,
     });
   globalForPrisma.pool = pool;
 

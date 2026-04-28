@@ -50,10 +50,10 @@ export default async function InstallPage() {
         ) : installationState.status === "schema_missing" ? (
           <InstallHint
             title="当前还缺少初始化条件"
-            description="站点还没有完成安装。数据库已经可连接，但当前还没有 Chihiro 所需的表结构。先执行 db push，把表建好，再回来继续初始化。"
+            description="站点还没有完成安装。数据库已经可连接，但当前还没有 Chihiro 所需的表结构。先执行 prisma migrate deploy 把表与 RLS 一并建好，再回来继续初始化。"
             helper={
               <code className="rounded-xl bg-zinc-100 px-3 py-2 text-xs text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-                npm run db:push
+                npx prisma migrate deploy
               </code>
             }
           />

@@ -24,8 +24,7 @@ enum AssetKind {
 }
 
 enum AssetProvider {
-  S3
-  R2
+  SUPABASE
   LOCAL
 }
 
@@ -37,6 +36,7 @@ model Post {
   status            ContentStatus @default(DRAFT)
   content           Json?
   contentHtml       String?
+  authorId          String?       @db.Uuid
   authorName        String?
   publishedAt       DateTime?
   publishedSnapshot Json?
@@ -51,11 +51,13 @@ model Post {
 
   @@index([status, publishedAt])
   @@index([categoryId])
+  @@index([authorId])
 }
 
 model Update {
   id            Int           @id @default(autoincrement())
   title         String
+  authorId      String?       @db.Uuid
   authorName    String?
   status        ContentStatus @default(DRAFT)
   content       Json?
@@ -66,6 +68,7 @@ model Update {
   updatedAt     DateTime      @updatedAt
 
   @@index([status, publishedAt])
+  @@index([authorId])
 }
 
 model Asset {
@@ -84,21 +87,6 @@ model Asset {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   postCovers   Post[]        @relation("PostCoverAsset")
-}
-
-model ObjectStorageSettings {
-  id              String        @id @default("default")
-  provider        AssetProvider @default(R2)
-  endpoint        String?
-  region          String        @default("auto")
-  bucket          String
-  accessKeyId     String
-  secretAccessKey String
-  publicBaseUrl   String
-  keyPrefix       String?
-  forcePathStyle  Boolean       @default(false)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
 }
 
 model Category {
@@ -150,25 +138,4 @@ model SiteSettings {
   githubUrl       String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-}
-
-model AdminUser {
-  id           String         @id @default(cuid())
-  username     String         @unique
-  passwordHash String
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  sessions     AdminSession[]
-}
-
-model AdminSession {
-  id        String    @id @default(cuid())
-  token     String    @unique
-  expiresAt DateTime
-  createdAt DateTime  @default(now())
-  userId    String
-  user      AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([expiresAt])
 }
