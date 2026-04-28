@@ -4,7 +4,7 @@ import { ContentStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseStoredRichTextContent } from "@/lib/rich-text-content";
-import { requireAdminSession } from "@/server/auth";
+import { getCurrentAdmin, requireAdminSession } from "@/server/auth";
 import {
   discardUpdateRevisionById,
   publishUpdateById,
@@ -30,8 +30,14 @@ export async function saveUpdateAction(
   const publishedAtInput = getOptionalString(formData, "publishedAt");
   const publishedAt = publishedAtInput ? parsePublishedAtInput(publishedAtInput) : null;
   const updateId = getOptionalUpdateId(formData, "updateId");
+  const admin = await getCurrentAdmin();
   const siteSettings = await getSiteSettings();
-  const fallbackAuthorName = siteSettings?.authorName ?? siteConfig.author;
+  const authorId = admin?.id ?? null;
+  const fallbackAuthorName =
+    (admin?.user_metadata?.display_name as string | undefined) ??
+    siteSettings?.authorName ??
+    admin?.email ??
+    siteConfig.author;
   const content = parseRichTextContent(formData);
   const contentHtml = getOptionalString(formData, "contentHtml");
 
@@ -40,6 +46,7 @@ export async function saveUpdateAction(
       id: updateId ?? undefined,
       content: content as unknown as Prisma.JsonValue,
       contentHtml,
+      authorId,
       authorName: fallbackAuthorName,
       status: currentStatus,
       publishedAt,

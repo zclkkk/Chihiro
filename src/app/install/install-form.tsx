@@ -163,7 +163,7 @@ export function InstallForm({ defaults, needsAdminSetup }: InstallFormProps) {
         <section className="grid gap-5 border-t border-zinc-200/80 pt-6 dark:border-zinc-800/80">
           {needsAdminSetup ? (
             <div className="grid gap-5 md:grid-cols-2">
-              <Field label="管理员帐号" name="adminUsername" defaultValue="admin" required />
+              <Field label="管理员邮箱" name="adminEmail" type="email" required />
               <Field label="管理员密码" name="adminPassword" type="password" required />
             </div>
           ) : (

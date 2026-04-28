@@ -72,7 +72,7 @@ export default async function InstallPage() {
               email: siteSettings?.email ?? siteConfig.email,
               githubUrl: siteSettings?.githubUrl ?? siteConfig.github,
             }}
-            needsAdminSetup={installationState.adminUserCount === 0}
+            needsAdminSetup={!installationState.hasAdminUser}
           />
         )}
       </section>

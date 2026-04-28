@@ -25,6 +25,7 @@ export type PostItem = {
   status: ContentStatus;
   content: Prisma.JsonValue | null;
   contentHtml: string | null;
+  authorId: string | null;
   authorName: string | null;
   publishedAt: string | null;
   createdAt: string;
@@ -92,6 +93,7 @@ type PublishedPostSnapshot = {
   summary: string | null;
   content: Prisma.JsonValue | null;
   contentHtml: string | null;
+  authorId: string | null;
   authorName: string | null;
   publishedAt: string | null;
   category: {
@@ -145,6 +147,7 @@ export type SavePostDraftInput = {
   categoryId: number | null;
   publishedAt: Date | null;
   tagIds: string[];
+  authorId: string | null;
   authorName: string | null;
 };
 
@@ -181,6 +184,7 @@ export async function savePostDraft(input: SavePostDraftInput): Promise<PostItem
       summary: input.summary,
       content: input.content,
       contentHtml: input.contentHtml,
+      authorId: input.authorId,
       authorName: input.authorName,
       publishedAt: input.publishedAt,
       category,
@@ -204,6 +208,7 @@ export async function savePostDraft(input: SavePostDraftInput): Promise<PostItem
     summary: input.summary,
     content: input.content ?? Prisma.DbNull,
     contentHtml: input.contentHtml,
+    authorId: input.authorId,
     authorName: input.authorName,
     publishedAt: input.publishedAt,
     status: input.status,
@@ -483,6 +488,7 @@ export async function publishPostById(id: number): Promise<PostItem> {
         summary: draftSnapshot.summary,
         content: draftSnapshot.content ?? Prisma.DbNull,
         contentHtml: draftSnapshot.contentHtml,
+        authorId: draftSnapshot.authorId,
         authorName: draftSnapshot.authorName,
         publishedAt: resolvedPublishedAt,
         category: draftSnapshot.category
@@ -518,6 +524,7 @@ export async function publishPostById(id: number): Promise<PostItem> {
         summary: current.summary,
         content: current.content ?? Prisma.DbNull,
         contentHtml: current.contentHtml,
+        authorId: current.authorId,
         authorName: current.authorName,
         publishedAt,
         category: current.category
@@ -745,6 +752,7 @@ function mapPostRecord(record: PostRecord): PostItem {
     status: record.status,
     content: record.content,
     contentHtml: record.contentHtml,
+    authorId: record.authorId,
     authorName: record.authorName,
     publishedAt: toIsoString(record.publishedAt),
     createdAt: record.createdAt.toISOString(),
@@ -791,6 +799,7 @@ function mapPublishedPostRecord(record: PostRecord): PostItem {
     status: record.status,
     content: snapshot.content,
     contentHtml: snapshot.contentHtml,
+    authorId: snapshot.authorId,
     authorName: snapshot.authorName,
     publishedAt: snapshot.publishedAt,
     createdAt: record.createdAt.toISOString(),
@@ -810,6 +819,7 @@ function buildPublishedSnapshot(record: PostRecord, publishedAt: Date): Publishe
     summary: record.summary,
     content: record.content,
     contentHtml: record.contentHtml,
+    authorId: record.authorId,
     authorName: record.authorName,
     publishedAt: publishedAt.toISOString(),
     category: record.category
@@ -843,6 +853,7 @@ function buildDraftSnapshot(input: {
   summary: string | null;
   content: Prisma.JsonValue | null;
   contentHtml: string | null;
+  authorId: string | null;
   authorName: string | null;
   publishedAt: Date | null;
   category: { id: number; name: string; slug: string } | null;
@@ -857,6 +868,7 @@ function buildDraftSnapshot(input: {
     summary: input.summary,
     content: input.content,
     contentHtml: input.contentHtml,
+    authorId: input.authorId,
     authorName: input.authorName,
     publishedAt: toIsoString(input.publishedAt),
     savedAt,
@@ -904,6 +916,7 @@ function parseDraftSnapshot(value: Prisma.JsonValue | null): DraftPostSnapshot |
     summary: snapshot.summary ?? null,
     content: snapshot.content ?? null,
     contentHtml: snapshot.contentHtml ?? null,
+    authorId: snapshot.authorId ?? null,
     authorName: snapshot.authorName ?? null,
     publishedAt: snapshot.publishedAt ?? null,
     savedAt,

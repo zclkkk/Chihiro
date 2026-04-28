@@ -82,7 +82,7 @@ export function AdminLoginDialog({
                 登录后台
               </h2>
               <p className="mt-3 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                输入后台帐号和密码后进入管理界面。
+                输入管理员邮箱和密码后进入管理界面。
               </p>
 
               <form action={formAction} className="mt-6 grid gap-4">
@@ -90,13 +90,13 @@ export function AdminLoginDialog({
 
                 <label className="grid gap-2">
                   <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">
-                    后台帐号
+                    管理员邮箱
                   </span>
                   <input
-                    type="text"
-                    name="username"
-                    autoComplete="username"
-                    placeholder="Enter admin username"
+                    type="email"
+                    name="email"
+                    autoComplete="email"
+                    placeholder="Enter admin email"
                     className="h-12 rounded-2xl border border-zinc-200/80 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-primary/40 dark:border-zinc-800/80 dark:bg-zinc-950/80 dark:text-zinc-100 dark:placeholder:text-zinc-500"
                   />
                 </label>

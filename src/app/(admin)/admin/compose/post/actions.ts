@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getPostPath } from "@/lib/routes";
 import { parseStoredRichTextContent } from "@/lib/rich-text-content";
-import { requireAdminSession } from "@/server/auth";
+import { getCurrentAdmin, requireAdminSession } from "@/server/auth";
 import {
   discardPostRevisionById,
   getPostByIdForAdmin,
@@ -42,8 +42,14 @@ export async function savePostDraftAction(
     .map((value) => value.trim())
     .filter(Boolean);
   const postId = getOptionalPostId(formData, "postId");
+  const admin = await getCurrentAdmin();
   const siteSettings = await getSiteSettings();
-  const authorName = siteSettings?.authorName ?? siteConfig.author;
+  const authorId = admin?.id ?? null;
+  const authorName =
+    (admin?.user_metadata?.display_name as string | undefined) ??
+    siteSettings?.authorName ??
+    admin?.email ??
+    siteConfig.author;
 
   try {
     const post = await savePostDraft({
@@ -57,6 +63,7 @@ export async function savePostDraftAction(
       categoryId,
       publishedAt,
       tagIds,
+      authorId,
       authorName,
     });
 

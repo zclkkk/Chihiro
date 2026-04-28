@@ -10,6 +10,7 @@ export type UpdateListSort = "latest" | "earliest" | "updated";
 export type UpdateItem = {
   id: number;
   title: string;
+  authorId: string | null;
   authorName: string;
   status: ContentStatus;
   content: Prisma.JsonValue | null;
@@ -37,6 +38,7 @@ export type UpdateNavigationItem = {
 
 type PublishedUpdateSnapshot = {
   title: string;
+  authorId: string | null;
   authorName: string | null;
   content: Prisma.JsonValue | null;
   contentHtml: string | null;
@@ -57,7 +59,7 @@ export type ListPublishedUpdatesOptions = {
 export async function listUpdatesForAdmin(): Promise<UpdateItem[]> {
   const items = await fetchUpdateRows(
     `
-      SELECT id, title, "authorName", status, content, "contentHtml", "publishedAt", "createdAt", "updatedAt", "draftSnapshot"
+      SELECT id, title, "authorId", "authorName", status, content, "contentHtml", "publishedAt", "createdAt", "updatedAt", "draftSnapshot"
       FROM "Update"
       ORDER BY "updatedAt" DESC, "createdAt" DESC
     `,
@@ -117,6 +119,7 @@ export type SaveUpdateInput = {
   id?: number;
   content: Prisma.JsonValue | null;
   contentHtml: string | null;
+  authorId: string | null;
   authorName: string | null;
   status: ContentStatus;
   publishedAt: Date | null;
@@ -134,6 +137,7 @@ export async function saveUpdate(input: SaveUpdateInput): Promise<UpdateItem> {
 
     const draftSnapshot = buildDraftSnapshot({
       title: resolvedTitle,
+      authorId: input.authorId,
       authorName: resolvedAuthorName,
       content: input.content,
       contentHtml: input.contentHtml,
@@ -147,7 +151,7 @@ export async function saveUpdate(input: SaveUpdateInput): Promise<UpdateItem> {
       },
     });
 
-    await persistUpdateAuthorName(update.id, resolvedAuthorName);
+    await persistUpdateAuthor(update.id, input.authorId, resolvedAuthorName);
 
     const refreshed = await fetchUpdateRowById(update.id);
 
@@ -159,6 +163,8 @@ export async function saveUpdate(input: SaveUpdateInput): Promise<UpdateItem> {
     title: resolvedTitle,
     content: input.content ?? Prisma.DbNull,
     contentHtml: input.contentHtml,
+    authorId: input.authorId,
+    authorName: input.authorName,
     publishedAt: input.publishedAt,
     status: input.status,
   };
@@ -179,7 +185,7 @@ export async function saveUpdate(input: SaveUpdateInput): Promise<UpdateItem> {
         data: createData,
       });
 
-  await persistUpdateAuthorName(update.id, input.authorName);
+  await persistUpdateAuthor(update.id, input.authorId, input.authorName);
 
   const refreshed = await fetchUpdateRowById(update.id);
 
@@ -220,7 +226,8 @@ export async function publishUpdateById(id: number): Promise<UpdateItem> {
     },
   });
 
-  await persistUpdateAuthorName(update.id, resolvedAuthorName);
+  const resolvedAuthorId = draftSnapshot?.authorId ?? current.authorId;
+  await persistUpdateAuthor(update.id, resolvedAuthorId, resolvedAuthorName);
 
   const refreshed = await fetchUpdateRowById(update.id);
 
@@ -311,6 +318,7 @@ function mapUpdateRecord(record: UpdateRecord): UpdateItem {
   return {
     id: record.id,
     title: record.title,
+    authorId: record.authorId,
     authorName: record.authorName ?? siteConfig.author,
     status: record.status,
     content: record.content,
@@ -326,6 +334,7 @@ async function fetchUpdateRows(sql: string) {
   return prisma.$queryRaw<Array<{
     id: number;
     title: string;
+    authorId: string | null;
     authorName: string | null;
     status: ContentStatus;
     content: Prisma.JsonValue | null;
@@ -341,6 +350,7 @@ async function fetchUpdateRowById(id: number) {
   const rows = await prisma.$queryRaw<Array<{
     id: number;
     title: string;
+    authorId: string | null;
     authorName: string | null;
     status: ContentStatus;
     content: Prisma.JsonValue | null;
@@ -351,7 +361,7 @@ async function fetchUpdateRowById(id: number) {
     draftSnapshot: Prisma.JsonValue | null;
   }>>(
     Prisma.sql`
-      SELECT id, title, "authorName", status, content, "contentHtml", "publishedAt", "createdAt", "updatedAt", "draftSnapshot"
+      SELECT id, title, "authorId", "authorName", status, content, "contentHtml", "publishedAt", "createdAt", "updatedAt", "draftSnapshot"
       FROM "Update"
       WHERE id = ${id}
       LIMIT 1
@@ -384,6 +394,7 @@ async function fetchPublishedUpdateRows(
   return prisma.$queryRaw<Array<{
     id: number;
     title: string;
+    authorId: string | null;
     authorName: string | null;
     status: ContentStatus;
     content: Prisma.JsonValue | null;
@@ -394,7 +405,7 @@ async function fetchPublishedUpdateRows(
     draftSnapshot: Prisma.JsonValue | null;
   }>>(
     Prisma.sql`
-      SELECT id, title, "authorName", status, content, "contentHtml", "publishedAt", "createdAt", "updatedAt", "draftSnapshot"
+      SELECT id, title, "authorId", "authorName", status, content, "contentHtml", "publishedAt", "createdAt", "updatedAt", "draftSnapshot"
       FROM "Update"
       ${whereSql}
       ${orderBySql}
@@ -434,6 +445,7 @@ function toIsoString(value: Date | null) {
 
 function buildDraftSnapshot(input: {
   title: string;
+  authorId: string | null;
   authorName: string | null;
   content: Prisma.JsonValue | null;
   contentHtml: string | null;
@@ -443,6 +455,7 @@ function buildDraftSnapshot(input: {
 
   return {
     title: input.title,
+    authorId: input.authorId,
     authorName: input.authorName,
     content: input.content,
     contentHtml: input.contentHtml,
@@ -477,6 +490,7 @@ function parseDraftSnapshot(value: Prisma.JsonValue | null): DraftUpdateSnapshot
 
   return {
     title: snapshot.title ?? "",
+    authorId: snapshot.authorId ?? null,
     authorName: typeof snapshot.authorName === "string" ? snapshot.authorName : null,
     content: snapshot.content ?? null,
     contentHtml: snapshot.contentHtml ?? null,
@@ -527,14 +541,10 @@ function truncateTitle(value: string) {
   return `${normalized.slice(0, 24)}…`;
 }
 
-async function persistUpdateAuthorName(updateId: number, authorName: string | null) {
-  if (!authorName) {
-    return;
-  }
-
+async function persistUpdateAuthor(updateId: number, authorId: string | null, authorName: string | null) {
   await prisma.$executeRaw`
     UPDATE "Update"
-    SET "authorName" = ${authorName}
+    SET "authorId" = ${authorId}, "authorName" = ${authorName}
     WHERE id = ${updateId}
   `;
 }

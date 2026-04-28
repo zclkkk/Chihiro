@@ -5,7 +5,7 @@ import {
   isDatabaseSchemaMissingError,
   isDatabaseUnavailableError,
 } from "@/server/database-errors";
-import { countAdminUsers } from "@/server/repositories/admin-auth";
+import { hasAdminUsers } from "@/server/auth";
 import { getSiteSettings } from "@/server/repositories/site";
 
 export type InstallationStatus =
@@ -17,7 +17,7 @@ export type InstallationStatus =
 export type InstallationState = {
   installed: boolean;
   status: InstallationStatus;
-  adminUserCount: number;
+  hasAdminUser: boolean;
   hasSiteSettings: boolean;
 };
 
@@ -26,22 +26,22 @@ export async function getInstallationState(): Promise<InstallationState> {
     return {
       installed: false,
       status: "missing_database",
-      adminUserCount: 0,
+      hasAdminUser: false,
       hasSiteSettings: false,
     };
   }
 
   try {
-    const [adminUserCount, siteSettings] = await Promise.all([
-      countAdminUsers(),
+    const [hasAdmin, siteSettings] = await Promise.all([
+      hasAdminUsers(),
       getSiteSettings(),
     ]);
     const hasSiteSettings = Boolean(siteSettings);
 
     return {
-      installed: adminUserCount > 0 && hasSiteSettings,
+      installed: hasAdmin && hasSiteSettings,
       status: "ready",
-      adminUserCount,
+      hasAdminUser: hasAdmin,
       hasSiteSettings,
     };
   } catch (error) {
@@ -49,7 +49,7 @@ export async function getInstallationState(): Promise<InstallationState> {
       return {
         installed: false,
         status: "schema_missing",
-        adminUserCount: 0,
+        hasAdminUser: false,
         hasSiteSettings: false,
       };
     }
@@ -58,7 +58,7 @@ export async function getInstallationState(): Promise<InstallationState> {
       return {
         installed: false,
         status: "database_unavailable",
-        adminUserCount: 0,
+        hasAdminUser: false,
         hasSiteSettings: false,
       };
     }
